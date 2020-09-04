@@ -208,12 +208,11 @@ public class LocalMinecraftInterface implements MinecraftInterface {
         		
         		registryGetIdMethod = ReflectionUtils.getMethodHandle(registryClass, SymbolicNames.METHOD_REGISTRY_GET_ID2);
         	}
-
+        	
         	stopAllExecutors();
         	
         	EntrypointUtils.invoke("main", ModInitializer.class, ModInitializer::onInitialize);
-
-            registryGetIdMethod = ReflectionUtils.getMethodHandle(registryClass, SymbolicNames.METHOD_REGISTRY_GET_ID);
+        	
             biomeProviderGetBiomeMethod = ReflectionUtils.getMethodHandle(noiseBiomeProviderClass, SymbolicNames.METHOD_NOISE_BIOME_PROVIDER_GET_BIOME);
             biomeZoomerGetBiomeMethod = ReflectionUtils.getMethodHandle(biomeZoomerClass, SymbolicNames.METHOD_BIOME_ZOOMER_GET_BIOME);
 
