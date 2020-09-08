@@ -68,16 +68,23 @@ public class FragmentQueueProcessor {
 	@CalledOnlyBy(AmidstThread.FRAGMENT_LOADER)
 	private void updateLayerManager(Dimension dimension) {
 		if (layerManager.updateAll(dimension)) {
-			reloadAll();
-			offscreenCache.clear();
+			tryReloadGraph();
+			offscreenCache.invalidate();
 		}
 	}
+
+	private volatile boolean firstLoad = true;
 
 	/**
 	 * Gets all of the fragments currently on the graph to offer, as they aren't stored in any cache.
 	 */
 	@CalledOnlyBy(AmidstThread.FRAGMENT_LOADER)
-	private synchronized void reloadAll() {
+	private synchronized void tryReloadGraph() {
+		if (firstLoad) {
+			firstLoad = false;
+			return;
+		}
+		
 		loadingQueue.clear();
 		for (FragmentGraphItem graphItem : (Iterable<FragmentGraphItem>) () -> graph.iterator()) {
 			loadingQueue.offer(graphItem.getFragment());
