@@ -1,64 +1,69 @@
 package amidst.mojangapi.world.oracle;
 
 import java.util.List;
-import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import amidst.documentation.ThreadSafe;
 import amidst.logging.AmidstLogger;
 import amidst.logging.AmidstMessageBox;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
-import amidst.mojangapi.minecraftinterface.RecognisedVersion;
+import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.biome.Biome;
 import amidst.mojangapi.world.biome.BiomeList;
 import amidst.mojangapi.world.biome.UnknownBiomeIdException;
 import amidst.mojangapi.world.coordinates.CoordinatesInWorld;
 import amidst.mojangapi.world.coordinates.Resolution;
+import amidst.util.FastRand;
 
 @ThreadSafe
 public class BiomeDataOracle {
-	private final MinecraftInterface.World minecraftWorld;
-	private final RecognisedVersion recognisedVersion;
+	private final MinecraftInterface.WorldAccessor worldAccessor;
+	private final Dimension dimension;
 	private final BiomeList biomeList;
-	private final boolean quarterResOverride; // Minecraft stopped using full resolution biomes with structures around 1.16, so we have to account for it.
+	private final boolean quarterResOverride;
+	private final int middleOfChunkOffset;
+	private final boolean accurateLocationCount;
 
-	public BiomeDataOracle(MinecraftInterface.World minecraftWorld, RecognisedVersion recognisedVersion, BiomeList biomeList) {
-		this.minecraftWorld = minecraftWorld;
-		this.recognisedVersion = recognisedVersion;
+	public static class Config {
+		public boolean quarterResOverride = true;
+		public int middleOfChunkOffset = 9;
+		public boolean accurateLocationCount = true;
+	}
+
+	public BiomeDataOracle(MinecraftInterface.WorldAccessor worldAccessor, Dimension dimension, BiomeList biomeList, Config config) {
+		this.worldAccessor = worldAccessor;
+		this.dimension = dimension;
 		this.biomeList = biomeList;
-		this.quarterResOverride = RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._1_16); // TODO: confirm version
+		this.quarterResOverride = config.quarterResOverride;
+		this.middleOfChunkOffset = config.middleOfChunkOffset;
+		this.accurateLocationCount = config.accurateLocationCount;
 	}
 
-	public void populateArray(CoordinatesInWorld corner, short[][] result, boolean useQuarterResolution) {
+	public void getBiomeData(CoordinatesInWorld corner, int width, int height, boolean useQuarterResolution,
+			Consumer<int[]> biomeDataConsumer) {
+		getBiomeData(corner, width, height, useQuarterResolution, data -> {
+			biomeDataConsumer.accept(data);
+			return null;
+		}, () -> null);
+	}
+
+	// Pass biome data to the mapper as a row-major int array; or return the default value if an error occured.
+	// width and height represent the number of samples, NOT the size of the region in the world.
+	public<T> T getBiomeData(CoordinatesInWorld corner, int width, int height, boolean useQuarterResolution,
+			Function<int[], T> biomeDataMapper, Supplier<T> defaultValue) {
 		Resolution resolution = Resolution.from(useQuarterResolution);
-		int width = result.length;
-		if (width > 0) {
-			int height = result[0].length;
-			int left = (int) corner.getXAs(resolution);
-			int top = (int) corner.getYAs(resolution);
-			try {
-				minecraftWorld.getBiomeData(left, top, width, height, useQuarterResolution, biomeData -> {
-					copyToResult(result, width, height, biomeData);
-					return null;
-				});
-			} catch (MinecraftInterfaceException e) {
-				AmidstLogger.error(e);
-				AmidstMessageBox.displayError("Error", e);
-			}
+		int left = (int) corner.getXAs(resolution);
+		int top = (int) corner.getYAs(resolution);
+		try {
+			return worldAccessor.getBiomeData(dimension, left, top, width, height, useQuarterResolution, biomeDataMapper);
+		} catch (MinecraftInterfaceException e) {
+			AmidstLogger.error(e);
+			AmidstMessageBox.displayError("Error", e);
+			return defaultValue.get();
 		}
-	}
-
-	public static void copyToResult(short[][] result, int width, int height, int[] biomeData) {
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				result[x][y] = (short) biomeData[getBiomeDataIndex(x, y, width)];
-			}
-		}
-	}
-
-	public static int getBiomeDataIndex(int x, int y, int width) {
-		return x + y * width;
 	}
 
 	public boolean isValidBiomeAtMiddleOfChunk(int chunkX, int chunkY, List<Biome> validBiomes) {
@@ -79,7 +84,7 @@ public class BiomeDataOracle {
 		}
 	}
 
-	public boolean isValidBiomeForStructureAtMiddleOfChunk(int chunkX, int chunkY, int size, List<Biome> validBiomes) {
+	public boolean isValidBiomeForStructureAtMiddleOfChunk(int chunkX, int chunkY, int size, List<Biome> validBiomes) { //FIXME: 1.16 changed to quarter res?
 		return isValidBiomeForStructure(getMiddleOfChunk(chunkX), getMiddleOfChunk(chunkY), size, validBiomes);
 	}
 
@@ -113,24 +118,20 @@ public class BiomeDataOracle {
 			int chunkY,
 			int size,
 			List<Biome> validBiomes,
-			Random random) {
+			FastRand random) {
 		return findValidLocation(getMiddleOfChunk(chunkX), getMiddleOfChunk(chunkY), size, validBiomes, random);
 	}
 
-	public CoordinatesInWorld findValidLocation(int x, int y, int size, List<Biome> validBiomes, Random random) {
-		if(RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._18w06a)) {
-			return doFindValidLocation(x, y, size, validBiomes, random, true);
-		} else {
-			return doFindValidLocation(x, y, size, validBiomes, random, false);
-		}
+	public CoordinatesInWorld findValidLocation(int x, int y, int size, List<Biome> validBiomes, FastRand random) {
+		return doFindValidLocation(x, y, size, validBiomes, random, accurateLocationCount);
 	}
 
-	// This algorithm slightly changed in 18w06: prior to this version,
+	// This algorithm slightly changed in the 1.13 snapshots: before,
 	// numberOfValidLocations was only incremented if the random check
 	// succeeded; it is now always incremented.
 	private CoordinatesInWorld doFindValidLocation(
 			int x, int y, int size, List<Biome> validBiomes,
-			Random random, boolean accurateLocationCount) {
+			FastRand random, boolean accurateLocationCount) {
 		int left = x - size >> 2;
 		int top = y - size >> 2;
 		int right = x + size >> 2;
@@ -168,11 +169,7 @@ public class BiomeDataOracle {
 	}
 
 	private int getMiddleOfChunk(int chunkCoord) {
-		if(RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._1_13)) { // TODO: confirm version
-			return (chunkCoord << 4) + 9;
-		} else {
-			return (chunkCoord << 4) + 8;
-		}
+		return (chunkCoord << 4) + middleOfChunkOffset;
 	}
 
 	public Biome getBiomeAtMiddleOfChunk(int chunkX, int chunkY)
@@ -182,12 +179,12 @@ public class BiomeDataOracle {
 
 	public Biome getBiomeAt(int x, int y, boolean useQuarterResolution)
 			throws UnknownBiomeIdException, MinecraftInterfaceException {
-		int biomeIndex = minecraftWorld.getBiomeData(x, y, 1, 1, useQuarterResolution, biomeData -> biomeData[0]);
+		int biomeIndex = worldAccessor.getBiomeData(dimension, x, y, 1, 1, useQuarterResolution, biomeData -> biomeData[0]);
 		return biomeList.getById(biomeIndex);
 	}
 
 	private<T> T getQuarterResolutionBiomeData(int x, int y, int width, int height, Function<int[], T> biomeDataMapper)
 			throws MinecraftInterfaceException {
-		return minecraftWorld.getBiomeData(x, y, width, height, true, biomeDataMapper);
+		return worldAccessor.getBiomeData(dimension, x, y, width, height, true, biomeDataMapper);
 	}
 }

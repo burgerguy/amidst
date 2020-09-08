@@ -42,6 +42,5 @@ public enum _1_13SymbolicNames {
 
 	public static final String CLASS_REGISTRY_KEY = "RegistryKey";
 	public static final String CONSTRUCTOR_REGISTRY_KEY = "<init>";
-	
-	
+
 }

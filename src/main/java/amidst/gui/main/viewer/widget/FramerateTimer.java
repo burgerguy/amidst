@@ -14,7 +14,7 @@ public class FramerateTimer {
 
 	@CalledOnlyBy(AmidstThread.EDT)
 	public FramerateTimer(int updatesPerSecond) {
-		msPerUpdate = (long) (1000f * (1f / updatesPerSecond));
+		msPerUpdate = (long) (1000d / updatesPerSecond);
 		reset();
 	}
 

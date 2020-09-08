@@ -4,27 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 import amidst.documentation.ThreadSafe;
-import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.world.coordinates.CoordinatesInWorld;
 import amidst.mojangapi.world.coordinates.Resolution;
 import amidst.mojangapi.world.oracle.SimplexNoise;
 import amidst.mojangapi.world.versionfeatures.DefaultBiomes;
-
-import kaptainwutax.seedutils.lcg.rand.JRand;
-import kaptainwutax.seedutils.mc.ChunkRand;
-import kaptainwutax.seedutils.mc.MCVersion;
+import amidst.util.FastRand;
 
 @ThreadSafe
 public class EndIslandOracle {
-	public static EndIslandOracle from(long seed, RecognisedVersion recognisedVersion) {
-		return new EndIslandOracle(createNoiseFunction(seed), seed, recognisedVersion);
+	public static EndIslandOracle from(long worldSeed, boolean canGenerateSmallIslands) {
+		return new EndIslandOracle(createNoiseFunction(worldSeed), worldSeed, canGenerateSmallIslands);
 	}
 
 	/**
 	 * Returns the noise function using the current seed.
 	 */
-	private static SimplexNoise createNoiseFunction(long seed) {
-		JRand random = new JRand(seed);
+	private static SimplexNoise createNoiseFunction(long worldSeed) {
+		FastRand random = new FastRand(worldSeed);
 		// Mimics the side-effects to the random number generator caused by Minecraft.
 		// Past 1.13, it just skips the random 17292 times.
 		random.advance(17292);
@@ -53,18 +49,20 @@ public class EndIslandOracle {
 	 */
 	private static final int OUTER_LANDS_DISTANCE_IN_CHUNKS = 64;
 
-	private final SimplexNoise noiseFunction;
-	private final long seed;
-	private final RecognisedVersion recognisedVersion;
+	private static final long OUTER_LANDS_DISTANCE_IN_BLOCKS = Resolution.CHUNK.convertFromThisToWorld(OUTER_LANDS_DISTANCE_IN_CHUNKS);
 
-	public EndIslandOracle(SimplexNoise noiseFunction, long seed, RecognisedVersion recognisedVersion) {
+	private final SimplexNoise noiseFunction;
+	private final long worldSeed;
+	private final boolean canGenerateSmallIslands;
+
+	public EndIslandOracle(SimplexNoise noiseFunction, long worldSeed, boolean canGenerateSmallIslands) {
 		this.noiseFunction = noiseFunction;
-		this.seed = seed;
-		this.recognisedVersion = recognisedVersion;
+		this.worldSeed = worldSeed;
+		this.canGenerateSmallIslands = canGenerateSmallIslands;
 	}
-	
+
 	public static int getBiomeAtBlock(long x, long y, List<LargeEndIsland> largeIslands) {		
-		if (x * x + y * y <= 1048576L) {
+		if (isInRange(x, y, OUTER_LANDS_DISTANCE_IN_BLOCKS)) {
 			return DefaultBiomes.theEnd;
 		} else {
 			float influence = getInfluenceAtBlock(x, y, largeIslands);
@@ -77,7 +75,7 @@ public class EndIslandOracle {
 			}
 		}
 	}
-	
+
 	public static float getInfluenceAtBlock(long x, long y, List<LargeEndIsland> largeIslands) {
 		float highestInfluence = -100.0f;
 		
@@ -100,7 +98,7 @@ public class EndIslandOracle {
 				steps,
 				steps);
 	}
-	
+
 	/**
 	 * Returns a list of all islands that might be touching a chunk-area.
 	 */
@@ -113,7 +111,7 @@ public class EndIslandOracle {
 		List<SmallEndIsland> smallEndIslands = findSurroundingSmallIslands(chunkX, chunkY, chunksPerFragmentX, chunksPerFragmentY, largeEndIslands);
 		return new EndIslandList(smallEndIslands, largeEndIslands);
 	}
-	
+
 	public List<LargeEndIsland> getLargeIslandsAt(CoordinatesInWorld corner) {
 		int steps = Resolution.CHUNK.getStepsPerFragment();
 		return findSurroundingLargeIslands(
@@ -186,17 +184,11 @@ public class EndIslandOracle {
 	    // Convert coordinates to long to guard against overflow
 		return (int) ((Math.abs(chunkX) * 3439 + Math.abs(chunkY) * 147) % 13 + 9);
 	}
-
-    /**
-     * Is the point (x, y) inside the disk of radius d centered at the origin?
-     */
-    private boolean isInRange(long x, long y, int d) {
-        // Guard against overflow
-        if (x < -d || x > d || y < -d || y > d)
-            return false;
-        return x * x + y * y <= d * d;
-    }
 	
+	private static boolean isInRange(long x, long y, long d) {
+		return x * x + y * y <= d * d;
+	}
+
 	private List<SmallEndIsland> findSurroundingSmallIslands(
 			long chunkX,
 			long chunkY,
@@ -204,7 +196,7 @@ public class EndIslandOracle {
 			int chunksPerFragmentY,
 			List<LargeEndIsland> largeIslands) {
 		List<SmallEndIsland> result = null;
-		if(RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._1_13)) { // TODO: need confirmation on this version
+		if(canGenerateSmallIslands) {
 			result = new ArrayList<>();
 			for (int y = -SMALL_ISLAND_SURROUNDING_CHUNKS; y <= chunksPerFragmentY + SMALL_ISLAND_SURROUNDING_CHUNKS; y++) {
 				for (int x = -SMALL_ISLAND_SURROUNDING_CHUNKS; x <= chunksPerFragmentX + SMALL_ISLAND_SURROUNDING_CHUNKS; x++) {
@@ -217,13 +209,20 @@ public class EndIslandOracle {
 		}
 		return result;
 	}
-    
+
+	private static final int SMALL_ISLANDS_FEATURE_INDEX = 0;
+	private static final int SMALL_ISLANDS_GENERATION_STAGE = 0;
+   
     private List<SmallEndIsland>  getSmallIslandsInChunk(long chunkX, long chunkY, List<LargeEndIsland> largeIslands) {
 		long blockX = chunkX << 4;
 		long blockY = chunkY << 4;
 		if (getBiomeAtBlock(blockX, blockY, largeIslands) == DefaultBiomes.theEndLow) {
-			ChunkRand rand = new ChunkRand();
-			rand.setDecoratorSeed(seed, (int) blockX, (int) blockY, 0, 0, MCVersion.v1_13);
+			FastRand rand = new FastRand(worldSeed);
+			long a = rand.nextLong() | 1L;
+			long b = rand.nextLong() | 1L;
+			long populationSeed = (long)(int) blockX * a + (long)(int) blockY * b ^ worldSeed; // we do the long -> int -> long conversion to replicate what minecraft does.
+			long decoratorSeed = populationSeed + SMALL_ISLANDS_FEATURE_INDEX + 10000 * SMALL_ISLANDS_GENERATION_STAGE;
+			rand.setSeed(decoratorSeed);
 			
 			List<SmallEndIsland> smallIslands = new ArrayList<>();
 			
@@ -258,9 +257,8 @@ public class EndIslandOracle {
 		}
 		return null;
 	}
-    
-    public RecognisedVersion getRecognisedVersion() {
-    	return recognisedVersion;
+
+    public boolean canGenerateSmallIslands() {
+    	return canGenerateSmallIslands;
     }
-    
 }

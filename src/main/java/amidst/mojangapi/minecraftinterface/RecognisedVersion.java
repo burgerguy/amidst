@@ -23,6 +23,12 @@ public enum RecognisedVersion {
 	// TODO: Remove these versions before V1_0?
 	// TODO: stronghold reset on V1_9pre4?
 	UNKNOWN,
+	_1_16_2    ("1.16.2",     "brxcyd$acyhaozannaaxungn$bacs[Jacoabuwacxxwdvxaezvzcst"),                                  // matches the launcher version id; 1.16.2-pre2  1.16.2-pre3  1.16.2-rc1  1.16.2-rc2  1.16.2
+	_1_16_2_pre1("1.16.2-pre1", "brvcya$acyeaoxanlaavumgn$bacq[Jacmabsvycxuwbvvaexvxcsr"),                                // matches the launcher version id: 1.16.2-pre1
+	_20w30a    ("20w30a",     "brucxw$acyaaoxanlaavumgn$bacq[Jacmabsvycxqwbvvaexvxcso"),                                  // matches the launcher version id: 20w30a
+	_20w29a    ("20w29a",     "brvcxx$acybaoxanlaayupgn$bact[Jacpabvwbcxrwevyaeywacsp"),                                  // matches the launcher version id: 20w29a
+	_20w28a    ("20w28a",     "buodar$adavarqaqeadrxigm$bafm[Jafiaeoyudalyxyrahrytcvj"),                                  // matches the launcher version id: 20w28a
+	_20w27a    ("20w27a",     "bqndap$adatanqamezstjgk$aabn[Jabjaapuvdajuyusadtuucvl"),                                   // matches the launcher version id: 20w27a
 	_1_16      ("1.16",       "bqedae$adaianoamczutlgm$aabp[Jablaaruxczyvauuadsuwcva"),                                   // matches the launcher version id: 1.16-pre8 1.16-rc1  1.16  1.16.1
 	_1_16_pre6 ("1.16-pre6",  "bqedaf$adajanoamczutlgm$aabp[Jablaaruxczzvauuadsuwcvb"),                                   // matches the launcher version id: 1.16-pre6  1.16-pre7
 	_1_16_pre5 ("1.16-pre5",  "bqddae$adaiannambzttkgl$aabo[Jabkaaquwczyuzutadruvcva"),                                   // matches the launcher version id: 1.16-pre5
@@ -144,6 +150,7 @@ public enum RecognisedVersion {
 	_1_11      ("1.11",       "rroumhkfph[Llw;mt[J[[Jmp"),                                                                // matches the launcher version id: 1.11         1.11-pre1
 	_16w44a    ("16w44a",     "rqotmgkfpg[Llv;ms[J[[Jmo"),                                                                // matches the launcher version id: 16w44a
 	_16w43a    ("16w43a",     "rpotmgkfpg[Llv;ms[J[[Jmo"),                                                                // matches the launcher version id: 16w43a       16w42a       16w41a       16w40a       16w39c
+	_16w39a    ("16w39a",     "rnotmgkfpg[Llv;ms[J[[Jmo"),                                                                // matches the launcher version id: 16w39a
 	_16w38a    ("16w38a",     "rlosmfkepf[Llu;mr[J[[Jmn"),                                                                // matches the launcher version id: 16w38a
 	_16w36a    ("16w36a",     "rkosmfkepf[Llu;mr[J[[Jmn"),                                                                // matches the launcher version id: 16w36a
 	_16w35a    ("16w35a",     "rjosmfkepf[Llu;mr[J[[Jmn"),                                                                // matches the launcher version id: 16w35a       16w33a       16w32b

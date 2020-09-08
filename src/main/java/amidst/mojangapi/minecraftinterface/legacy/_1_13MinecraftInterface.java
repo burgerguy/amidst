@@ -1,11 +1,12 @@
 package amidst.mojangapi.minecraftinterface.legacy;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
@@ -15,6 +16,9 @@ import amidst.logging.AmidstLogger;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
+import amidst.mojangapi.minecraftinterface.ReflectionUtils;
+import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
+import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldType;
 import amidst.util.ArrayCache;
 
@@ -47,6 +51,14 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 	 * biome data.
 	 */
 	private MethodHandle getBiomesMethod;
+	
+	/**
+	 * A boolean that is later set to provide whether the
+	 * 1.13 method parameters should be used to invoke the
+	 * method. We make it its own boolean so we don't
+	 * have to check the SymbolicClass every time.
+	 */
+	private boolean use113GetBiomesMethod;
 
 	/**
 	 * The biome registry, for use with versions >= 18w33a
@@ -96,117 +108,13 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 				recognisedVersion);
 	}
 
-	private int[] populateBiomeData(int[] data, int x, int y, int width, int height, Object biomeGen)
-			throws MinecraftInterfaceException {
-		try {
-			/**
-			 * We break the region in 16x16 chunks, to get better performance
-			 * out of the LazyArea used by the game. Sadly, we get no
-			 * performance gain in 18w16a and newer, but in previous snapshots
-			 * we get a ~1.5x improvement.
-			 */
-			if (RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._18w16a)) {
-				Object[] biomes = getBiomeDataInner(x, y, width, height, biomeGen);
-				for (int i = 0; i < biomes.length; i++) {
-					data[i] = getBiomeId(biomes[i]);
-				}
-			} else {
-				int chunkSize = 16;
-				for (int x0 = 0; x0 < width; x0 += chunkSize) {
-					int w = Math.min(chunkSize, width - x0);
-
-					for (int y0 = 0; y0 < height; y0 += chunkSize) {
-						int h = Math.min(chunkSize, height - y0);
-
-						Object[] biomes = getBiomeDataInner(x + x0, y + y0, w, h, biomeGen);
-
-						for (int i = 0; i < w; i++) {
-							for (int j = 0; j < h; j++) {
-								int idx = i + j * w;
-								int trueIdx = (x0 + i) + (y0 + j) * width;
-								data[trueIdx] = getBiomeId(biomes[idx]);
-							}
-						}
-					}
-				}
-			}
-			return data;
-		} catch (Throwable e) {
-			throw new MinecraftInterfaceException("unable to get biome data", e);
-		}
-	}
-
-	private Object[] getBiomeDataInner(int x, int y, int width, int height, Object biomeGen) throws Throwable {
-		if(genLayerClass.hasMethod(_1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA)) {
-			return (Object[]) getBiomesMethod.invoke(biomeGen, x, y, width, height, null);
-		} else {
-			return (Object[]) getBiomesMethod.invoke(biomeGen, x, y, width, height);
-		}
-	}
-
-	private synchronized void initBiomeGetIdHandle()
-			throws IllegalArgumentException,
-			IllegalAccessException,
-			InstantiationException,
-			InvocationTargetException {
-		if (biomeGetIdMethod != null) {
-			return;
-		}
-		Method biomeRawMethod = biomeClass.getMethod(_1_13SymbolicNames.METHOD_BIOME_GET_ID).getRawMethod();
-		if (registryKeyClass != null && !biomeRawMethod.getReturnType().equals(Integer.TYPE)) {
-			biomeRegistry = getBiomeRegistry();
-			biomeRawMethod = registryClass.getMethod(_1_13SymbolicNames.METHOD_REGISTRY_GET_ID).getRawMethod();
-		}
-		biomeGetIdMethod = MethodHandles.lookup().unreflect(biomeRawMethod);
-	}
-
-	private Object getBiomeRegistry()
-			throws IllegalArgumentException,
-			IllegalAccessException,
-			InstantiationException,
-			InvocationTargetException {
-		SymbolicObject metaRegistry = (SymbolicObject) registryClass
-				.getStaticFieldValue(_1_13SymbolicNames.FIELD_REGISTRY_META_REGISTRY);
-		Object biomeRegistryKey = registryKeyClass
-				.callConstructor(_1_13SymbolicNames.CONSTRUCTOR_REGISTRY_KEY, "biome")
-				.getObject();
-
-		String getByKey = _1_13SymbolicNames.METHOD_REGISTRY_GET_BY_KEY;
-		if (!registryClass.getMethod(getByKey).hasReturnType(Object.class)) {
-			getByKey = _1_13SymbolicNames.METHOD_REGISTRY_GET_BY_KEY2;
-		}
-
-		Object biomeRegistryObj = metaRegistry.callMethod(getByKey, biomeRegistryKey);
-		return biomeRegistryObj;
-	}
-
 	@Override
-	public synchronized MinecraftInterface.World createWorld(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
-
+	public synchronized MinecraftInterface.WorldConfig createWorldConfig() throws MinecraftInterfaceException {
 		try {
 			initializeIfNeeded();
-
-			// @formatter:off
-			ThreadLocal<Object[]> threadedBiomeGenerators = ThreadLocal.withInitial(() -> {
-				try {
-					return (Object[]) layerUtilClass.callStaticMethod(
-						_1_13SymbolicNames.METHOD_LAYER_UTIL_INITIALIZE_ALL,
-						seed,
-						getWorldType(worldType).getObject(),
-						getGenSettings(generatorOptions).getObject()
-					);
-				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
-						| InstantiationException e) {
-					throw new RuntimeException(e);
-				}
-			});
-			// @formatter:on
-			
-			return new World(threadedBiomeGenerators);
-
-		} catch (Throwable e) {
-			throw new MinecraftInterfaceException("unable to create world", e);
+			return new WorldConfig();
+		} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | InstantiationException e) {
+			throw new MinecraftInterfaceException("unable to create config", e);
 		}
 	}
 
@@ -218,7 +126,7 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		if (isInitialized) {
 			return;
 		}
-
+		
 		String register = _1_13SymbolicNames.METHOD_BOOTSTRAP_REGISTER;
 		if(RecognisedVersion.isNewer(recognisedVersion, RecognisedVersion._1_13_2)) {
 			if(bootstrapClass.getMethod(_1_13SymbolicNames.METHOD_BOOTSTRAP_REGISTER3).hasModifiers(Modifier.PUBLIC)) {
@@ -231,9 +139,10 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		initBiomeGetIdHandle();
 		
 		if(genLayerClass.hasMethod(_1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA)) {
-			getBiomesMethod = getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA);
+			getBiomesMethod = ReflectionUtils.getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA);
+			use113GetBiomesMethod = true;
 		} else {
-			getBiomesMethod = getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA2);
+			getBiomesMethod = ReflectionUtils.getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA2);
 		}
 		
 		bootstrapClass.callStaticMethod(register);
@@ -260,6 +169,46 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		isInitialized = true;
 	}
 
+	private synchronized void initBiomeGetIdHandle()
+			throws IllegalArgumentException,
+			IllegalAccessException,
+			InstantiationException,
+			InvocationTargetException {
+		if (biomeGetIdMethod != null) {
+			return;
+		}
+		
+		boolean biomeGetIdMethodReturnsInt = biomeClass.getMethod(_1_13SymbolicNames.METHOD_BIOME_GET_ID)
+															.getRawMethod().getReturnType().equals(Integer.TYPE);
+		
+		if (registryKeyClass != null && !biomeGetIdMethodReturnsInt) {
+			biomeRegistry = getBiomeRegistry();
+			biomeGetIdMethod = ReflectionUtils.getMethodHandle(registryClass, _1_13SymbolicNames.METHOD_REGISTRY_GET_ID);
+		} else {
+			biomeGetIdMethod = ReflectionUtils.getMethodHandle(biomeClass, _1_13SymbolicNames.METHOD_BIOME_GET_ID);
+		}
+	}
+
+	private Object getBiomeRegistry()
+			throws IllegalArgumentException,
+			IllegalAccessException,
+			InstantiationException,
+			InvocationTargetException {
+		SymbolicObject metaRegistry = (SymbolicObject) registryClass
+				.getStaticFieldValue(_1_13SymbolicNames.FIELD_REGISTRY_META_REGISTRY);
+		Object biomeRegistryKey = registryKeyClass
+				.callConstructor(_1_13SymbolicNames.CONSTRUCTOR_REGISTRY_KEY, "biome")
+				.getObject();
+
+		String getByKey = _1_13SymbolicNames.METHOD_REGISTRY_GET_BY_KEY;
+		if (!registryClass.getMethod(getByKey).hasReturnType(Object.class)) {
+			getByKey = _1_13SymbolicNames.METHOD_REGISTRY_GET_BY_KEY2;
+		}
+
+		Object biomeRegistryObj = metaRegistry.callMethod(getByKey, biomeRegistryKey);
+		return biomeRegistryObj;
+	}
+
 	private SymbolicObject getWorldType(WorldType worldType) throws IllegalArgumentException, IllegalAccessException {
 		return (SymbolicObject) worldTypeClass.getStaticFieldValue(worldType.getSymbolicFieldName());
 	}
@@ -275,49 +224,143 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		return genSettingsClass.callConstructor(_1_13SymbolicNames.CONSTRUCTOR_GEN_SETTINGS);
 	}
 
-	private int getBiomeId(Object biome) throws MinecraftInterfaceException {
-		try {
-			if (biomeRegistry != null) {
-				return (int) biomeGetIdMethod.invoke(biomeRegistry, biome);
-			} else {
-				return (int) biomeGetIdMethod.invoke(biome);
-			}
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new MinecraftInterfaceException("unable to get biome data", e);
-		}
-	}
-
 	@Override
 	public RecognisedVersion getRecognisedVersion() {
 		return recognisedVersion;
 	}
-	
-	private MethodHandle getMethodHandle(SymbolicClass symbolicClass, String method) throws IllegalAccessException {
-	    Method rawMethod = symbolicClass.getMethod(method).getRawMethod();
-	    return MethodHandles.lookup().unreflect(rawMethod);
-	}
 
-	private class World implements MinecraftInterface.World {
-		/**
-		 * A Threadlocal holding instances of both the quarter and full resolution
-		 * biome generators.
-		 */
-		private final ThreadLocal<Object[]> threadedBiomeGenerators;
+	private class WorldConfig implements MinecraftInterface.WorldConfig {
 
-		private World(ThreadLocal<Object[]> threadedBiomeGenerators) {
-			this.threadedBiomeGenerators = threadedBiomeGenerators;
+		@Override
+		public Set<Dimension> supportedDimensions() {
+			return Collections.singleton(Dimension.OVERWORLD);
 		}
 
 		@Override
-		public<T> T getBiomeData(int x, int y, int width, int height,
+		public synchronized MinecraftInterface.WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions)
+				throws MinecraftInterfaceException {
+
+			try {
+				// @formatter:off
+				Object[] genLayers = (Object[]) layerUtilClass.callStaticMethod(
+					_1_13SymbolicNames.METHOD_LAYER_UTIL_INITIALIZE_ALL,
+					seed,
+					getWorldType(worldType).getObject(),
+					getGenSettings(generatorOptions).getObject()
+				);
+				// @formatter:on
+				
+				return new WorldAccessor(genLayers[0], genLayers[1]);
+
+			} catch (
+					IllegalAccessException
+					| IllegalArgumentException
+					| InvocationTargetException
+					| InstantiationException e) {
+				throw new MinecraftInterfaceException("unable to create world", e);
+			}
+		}
+	}
+
+	private class WorldAccessor implements MinecraftInterface.WorldAccessor {
+		/**
+		 * A GenLayer instance, at quarter scale to the final biome layer (i.e. both
+		 * axis are divided by 4). Minecraft calculates biomes at
+		 * quarter-resolution, then noisily interpolates the biome-map up to 1:1
+		 * resolution when needed, this is the biome GenLayer before it is
+		 * interpolated.
+		 */
+		private final Object quarterResolutionBiomeGenerator;
+
+		/**
+		 * A GenLayer instance, the biome layer. (1:1 scale) Minecraft calculates
+		 * biomes at quarter-resolution, then noisily interpolates the biome-map up
+		 * to 1:1 resolution when needed, this is the interpolated biome GenLayer.
+		 */
+		private final Object fullResolutionBiomeGenerator;
+
+		private WorldAccessor(Object quarterResolutionGen, Object fullResolutionGen) {
+			this.quarterResolutionBiomeGenerator = quarterResolutionGen;
+			this.fullResolutionBiomeGenerator = fullResolutionGen;
+		}
+
+		@Override
+		public<T> T getBiomeData(Dimension dimension,
+				int x, int y, int width, int height,
 				boolean useQuarterResolution, Function<int[], T> biomeDataMapper)
 				throws MinecraftInterfaceException {
-			int biomeGeneratorIndex = useQuarterResolution ? 0 : 1;
-			return dataArray.withArrayFaillible(width * height, data -> {
-				populateBiomeData(data, x, y, width, height, threadedBiomeGenerators.get()[biomeGeneratorIndex]);
-				return biomeDataMapper.apply(data);
-			});
+			if (dimension != Dimension.OVERWORLD)
+				throw new UnsupportedDimensionException(dimension);
+
+			Object biomeGenerator = useQuarterResolution ? quarterResolutionBiomeGenerator : fullResolutionBiomeGenerator;
+			int size = width * height;
+		    return dataArray.withArrayFaillible(size, data -> {
+			    try {
+			    	if(size <= 16) {
+			    		data[0] = getBiomeId(getBiomeData(x, y, width, height, biomeGenerator));
+			    		return biomeDataMapper.apply(data);
+			    	}
+			    	
+			        /**
+			         * We break the region in 16x16 chunks, to get better performance out
+			         * of the LazyArea used by the game. This gives a ~2x improvement.
+			         * 
+			         * In the period of time between 18w16a to 18w47a, this caused the
+			         * performance to be worse, so we exclude those versions here.
+		             */
+					if (RecognisedVersion.isNewerOrEqualTo(recognisedVersion, RecognisedVersion._18w16a)
+					 && RecognisedVersion.isOlder(recognisedVersion, RecognisedVersion._18w47b)) {
+						Object[] biomes = getBiomeData(x, y, width, height, biomeGenerator);
+						for (int i = 0; i < biomes.length; i++) {
+							data[i] = getBiomeId(biomes[i]);
+						}
+					} else {
+						int chunkSize = 16;
+						for (int x0 = 0; x0 < width; x0 += chunkSize) {
+							int w = Math.min(chunkSize, width - x0);
+	
+							for (int y0 = 0; y0 < height; y0 += chunkSize) {
+								int h = Math.min(chunkSize, height - y0);
+	
+								Object[] biomes = getBiomeData(x + x0, y + y0, w, h, biomeGenerator);
+	
+								for (int i = 0; i < w; i++) {
+									for (int j = 0; j < h; j++) {
+										int idx = i + j * w;
+										int trueIdx = (x0 + i) + (y0 + j) * width;
+										data[trueIdx] = getBiomeId(biomes[idx]);
+									}
+								}
+							}
+						}
+					}
+			    } catch (Throwable e) {
+			        throw new MinecraftInterfaceException("unable to get biome data", e);
+			    }
+
+			    return biomeDataMapper.apply(data);
+		    });
+		}
+
+		private Object[] getBiomeData(int x, int y, int width, int height, Object biomeGen) throws Throwable {
+			if(use113GetBiomesMethod) {
+				return (Object[]) getBiomesMethod.invokeExact(biomeGen, x, y, width, height, (Object) null);
+			} else {
+				return (Object[]) getBiomesMethod.invokeExact(biomeGen, x, y, width, height);
+			}
+		}
+
+		private int getBiomeId(Object biome) throws MinecraftInterfaceException {
+			try {
+				if (biomeRegistry != null) {
+					return (int) biomeGetIdMethod.invokeExact(biomeRegistry, biome);
+				} else {
+					return (int) biomeGetIdMethod.invokeExact(biome);
+				}
+			} catch (Throwable e) {
+				e.printStackTrace();
+				throw new MinecraftInterfaceException("unable to get biome data", e);
+			}
 		}
 	}
 }

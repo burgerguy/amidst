@@ -11,20 +11,20 @@ import amidst.gui.main.viewer.BiomeSelection;
 
 @NotThreadSafe
 public class BiomeToggleWidget extends ImmutableIconWidget {
-	private final BiomeWidget biomeWidget;
 	private final BiomeSelection biomeSelection;
+	private final BiomeWidget biomeWidget;
 
 	@CalledOnlyBy(AmidstThread.EDT)
-	public BiomeToggleWidget(CornerAnchorPoint anchor, BiomeWidget biomeWidget, BiomeSelection biomeSelection) {
+	public BiomeToggleWidget(CornerAnchorPoint anchor, BiomeSelection biomeSelection, BiomeWidget biomeWidget) {
 		super(anchor, ResourceLoader.getImage("/amidst/gui/main/highlighter.png"));
-		this.biomeWidget = biomeWidget;
 		this.biomeSelection = biomeSelection;
+		this.biomeWidget = biomeWidget;
 	}
 
 	@CalledOnlyBy(AmidstThread.EDT)
 	@Override
 	public boolean onMousePressed(int x, int y) {
-		biomeWidget.toggleVisibility();
+		this.biomeWidget.toggleVisibility();
 		return true;
 	}
 

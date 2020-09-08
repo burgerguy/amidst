@@ -21,7 +21,7 @@ public class CpuUsageTimer {
 	@CalledOnlyBy(AmidstThread.EDT)
 	public CpuUsageTimer(int updatesPerSecond) {
 		this.operatingSystemMXBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-		msPerUpdate = (long) (1000f * (1f / updatesPerSecond));
+		msPerUpdate = (long) (1000d / updatesPerSecond);
 		reset();
 	}
 
