@@ -1,6 +1,7 @@
 package amidst.mojangapi.world.biome;
 
 import java.awt.Color;
+import java.util.Random;
 
 import amidst.documentation.Immutable;
 import amidst.settings.biomeprofile.BiomeColorJson;
@@ -15,7 +16,14 @@ public class BiomeColor {
 		return UNKNOWN_BIOME_COLOR;
 	}
 
+	public static BiomeColor random() {
+		byte[] bytes = new byte[3];
+		RANDOM.nextBytes(bytes);
+		return new BiomeColor(bytes[0] + 128, bytes[1] + 128, bytes[2] + 128);
+	}
+
 	private static final BiomeColor UNKNOWN_BIOME_COLOR = new BiomeColor(0, 0, 0);
+	private static final Random RANDOM = new Random();
 
 	private static final int HIDDEN_NUMBER = 30;
 	private static final int LIGHTEN_BRIGHTNESS = 40;
