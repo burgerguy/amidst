@@ -1,15 +1,18 @@
 package amidst.settings.biomeprofile;
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import amidst.documentation.ThreadSafe;
 import amidst.logging.AmidstLogger;
+import amidst.logging.AmidstMessageBox;
 import amidst.mojangapi.world.biome.BiomeColor;
 import amidst.mojangapi.world.biome.UnknownBiomeIdException;
 
 @ThreadSafe
 public class BiomeProfileSelection {
 	private ConcurrentHashMap<Integer, BiomeColor> biomeColors;
+	private Set<Integer> unknownBiomes;
 
 	public BiomeProfileSelection(BiomeProfile biomeProfile) {
 		set(biomeProfile);
@@ -19,11 +22,12 @@ public class BiomeProfileSelection {
 		try {
 			return getBiomeColor(index);
 		} catch (UnknownBiomeIdException e) {
-			// we display an error before filling the spot with a random color
-			AmidstLogger.error("Unknown biome index " + index + ", using a random color.");
-			BiomeColor newColor = BiomeColor.random();
-			biomeColors.put(index, newColor);
-			return newColor;
+			// Only show an error if this is the first time we encounter this biome
+			if (unknownBiomes.add(index)) {
+				AmidstLogger.error(e);
+				AmidstMessageBox.displayError("Error", e);
+			}
+			return BiomeColor.unknown();
 		}
 	}
 
@@ -38,6 +42,7 @@ public class BiomeProfileSelection {
 
 	public void set(BiomeProfile biomeProfile) {
 		this.biomeColors = biomeProfile.createBiomeColorMap();
+		this.unknownBiomes = ConcurrentHashMap.newKeySet();
 		AmidstLogger.info("Biome profile activated: " + biomeProfile.getName());
 	}
 }
