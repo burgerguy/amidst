@@ -6,9 +6,11 @@ import amidst.documentation.Immutable;
 import amidst.mojangapi.file.ImmutablePlayerInformationProvider;
 import amidst.mojangapi.file.PlayerInformationProvider;
 import amidst.mojangapi.file.SaveGame;
+import amidst.mojangapi.minecraftinterface.LoggingMinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
+import amidst.mojangapi.minecraftinterface.local.LocalMinecraftInterface;
 import amidst.mojangapi.world.icon.producer.MultiProducer;
 import amidst.mojangapi.world.icon.producer.PlayerProducer;
 import amidst.mojangapi.world.icon.producer.SpawnProducer;
@@ -75,7 +77,16 @@ public class WorldBuilder {
 			worldOptions.getWorldType(),
 			worldOptions.getGeneratorOptions());
 		seedHistoryLogger.log(recognisedVersion, worldOptions.getWorldSeed());
-		return DefaultVersionFeatures.builder(worldOptions, minecraftWorld).create(recognisedVersion);
+		VersionFeatures features = DefaultVersionFeatures.builder(worldOptions, minecraftWorld).create(recognisedVersion);
+		
+		if (minecraftInterface instanceof LoggingMinecraftInterface) {
+			MinecraftInterface innerInterface = ((LoggingMinecraftInterface) minecraftInterface).getInner();
+			if(innerInterface instanceof LocalMinecraftInterface) {
+				((LocalMinecraftInterface) innerInterface).addModdedBiomesToBiomeList(features.get(FeatureKey.BIOME_LIST));
+			}
+		}
+		
+		return features;
 	}
 
 	private World create(

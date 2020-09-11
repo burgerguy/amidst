@@ -38,4 +38,9 @@ public enum SymbolicNames {
 	public static final String METHOD_BIOME_ZOOMER_GET_BIOME = "getBiome";
 
     public static final String CLASS_BIOME = "Biome";
+    
+    // START MODDED TWEAKS
+    
+    public static final String CLASS_IDENTIFIER = "Identifier";
+    public static final String METHOD_REGISTRY_GET_IDENTIFIER = "getIdentifier";
 }

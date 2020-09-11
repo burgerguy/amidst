@@ -78,9 +78,8 @@ public class BiomeList {
 		return biomes.values().size();
 	}
 
-	public static BiomeList construct(BiomeList biomeList) {
-		biomeList.isModifiable = false;
-		return biomeList;
+	public BiomeList construct() {
+		this.isModifiable = false;
+		return this;
 	}
-
 }

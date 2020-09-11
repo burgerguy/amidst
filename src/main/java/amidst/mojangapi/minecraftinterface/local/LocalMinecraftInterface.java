@@ -3,6 +3,7 @@ package amidst.mojangapi.minecraftinterface.local;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -27,6 +28,9 @@ import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldType;
+import amidst.mojangapi.world.biome.Biome;
+import amidst.mojangapi.world.biome.BiomeList;
+import amidst.mojangapi.world.biome.BiomeType;
 import amidst.util.ArrayCache;
 
 import net.fabricmc.api.ModInitializer;
@@ -248,6 +252,22 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 			throws InstantiationException, IllegalAccessException,
 			IllegalArgumentException, InvocationTargetException, MinecraftInterfaceException {
 		return resourceKeyClass.callConstructor(SymbolicNames.CONSTRUCTOR_RESOURCE_KEY, key).getObject();
+	}
+
+	public void addModdedBiomesToBiomeList(BiomeList biomeList) throws MinecraftInterfaceException {
+		initializeIfNeeded();
+		
+		try {
+			Method getIdentifierMethod = registryClass.getMethod(SymbolicNames.METHOD_REGISTRY_GET_IDENTIFIER).getRawMethod();
+			
+			for(Object biome : (Iterable<?>) biomeRegistry) {
+				int biomeIndex = (int) registryGetIdMethod.invokeExact(biomeRegistry, biome);
+				String biomeName = getIdentifierMethod.invoke(biomeRegistry, biome).toString();
+				if (!biomeList.doesIdExist(biomeIndex)) biomeList.add(new Biome(biomeIndex, biomeName, BiomeType.PLAINS));
+			}
+		} catch (Throwable e) {
+			AmidstLogger.error(e, "Unable to add all modded biomes to biome list");
+		}
 	}
 
 	private class World implements MinecraftInterface.World {

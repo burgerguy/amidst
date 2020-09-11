@@ -43,6 +43,7 @@ public enum DefaultClassTranslator {
                     .optionalMethod(METHOD_REGISTRY_GET_ID, "method_10249").real("java.lang.Object").end()
                     .optionalMethod(METHOD_REGISTRY_GET_ID2, "method_10206").real("java.lang.Object").end()
                     .requiredMethod(METHOD_REGISTRY_GET_BY_KEY, "method_10223").symbolic(CLASS_RESOURCE_KEY).end()
+                    .requiredMethod(METHOD_REGISTRY_GET_IDENTIFIER, "method_10221").real("java.lang.Object").end()
             .next()
                 .ifDetect(c -> c.searchForUtf8EqualTo("Missing builtin registry: ")) // since 20w28a
                 .thenDeclareOptional(CLASS_REGISTRY_ACCESS)
@@ -97,6 +98,11 @@ public enum DefaultClassTranslator {
                     && c.searchForLong(1000000L)
                 )
                 .thenDeclareOptional(CLASS_UTIL)
+            .next()
+            	.ifDetect(c ->
+            		c.searchForStringContaining("Non [a-z0-9_.-] character in namespace of location: ")
+            	)
+            	.thenDeclareRequired(CLASS_IDENTIFIER)
             .construct();
     }
     // @formatter:on
