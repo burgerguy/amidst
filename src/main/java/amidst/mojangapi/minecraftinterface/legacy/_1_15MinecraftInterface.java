@@ -1,6 +1,5 @@
 package amidst.mojangapi.minecraftinterface.legacy;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -28,7 +27,6 @@ import amidst.logging.AmidstLogger;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
-import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldType;
@@ -60,9 +58,9 @@ public class _1_15MinecraftInterface implements MinecraftInterface {
 	private final SymbolicClass netherBiomeSettingsClass;
 	private final SymbolicClass utilClass;
 
-	private MethodHandle registryGetIdMethod;
-    private MethodHandle biomeProviderGetBiomeMethod;
-    private MethodHandle biomeZoomerGetBiomeMethod;
+	private Method registryGetIdMethod;
+    private Method biomeProviderGetBiomeMethod;
+    private Method biomeZoomerGetBiomeMethod;
 
 	private Object biomeRegistry;
 	private Object biomeProviderRegistry;
@@ -278,9 +276,9 @@ public class _1_15MinecraftInterface implements MinecraftInterface {
             biomeRegistry = Objects.requireNonNull(getFromRegistryByKey(metaRegistry, "biome"));
             biomeProviderRegistry = Objects.requireNonNull(getFromRegistryByKey(metaRegistry, "biome_source_type"));
 
-            registryGetIdMethod = ReflectionUtils.getMethodHandle(registryClass, _1_15SymbolicNames.METHOD_REGISTRY_GET_ID);
-            biomeProviderGetBiomeMethod = ReflectionUtils.getMethodHandle(noiseBiomeProviderClass, _1_15SymbolicNames.METHOD_NOISE_BIOME_PROVIDER_GET_BIOME);
-            biomeZoomerGetBiomeMethod = ReflectionUtils.getMethodHandle(overworldBiomeZoomerClass, _1_15SymbolicNames.METHOD_BIOME_ZOOMER_GET_BIOME);
+            registryGetIdMethod = registryClass.getMethod(_1_15SymbolicNames.METHOD_REGISTRY_GET_ID).getRawMethod();
+            biomeProviderGetBiomeMethod = noiseBiomeProviderClass.getMethod(_1_15SymbolicNames.METHOD_NOISE_BIOME_PROVIDER_GET_BIOME).getRawMethod();
+            biomeZoomerGetBiomeMethod = overworldBiomeZoomerClass.getMethod(_1_15SymbolicNames.METHOD_BIOME_ZOOMER_GET_BIOME).getRawMethod();
         } catch(IllegalArgumentException | IllegalAccessException | InstantiationException
                 | InvocationTargetException e) {
             throw new MinecraftInterfaceException("unable to initialize the MinecraftInterface", e);
@@ -409,11 +407,11 @@ public class _1_15MinecraftInterface implements MinecraftInterface {
 		private int getBiomeIdAt(Object biomeProvider, int biomeHeight, int x, int y, boolean useQuarterResolution) throws Throwable {
 		    Object biome;
 		    if(useQuarterResolution) {
-		        biome = biomeProviderGetBiomeMethod.invokeExact(biomeProvider, x, biomeHeight, y);
+		        biome = biomeProviderGetBiomeMethod.invoke(biomeProvider, x, biomeHeight, y);
 		    } else {
-		        biome = biomeZoomerGetBiomeMethod.invokeExact(biomeZoomer, seedForBiomeZoomer, x, biomeHeight, y, biomeProvider);
+		        biome = biomeZoomerGetBiomeMethod.invoke(biomeZoomer, seedForBiomeZoomer, x, biomeHeight, y, biomeProvider);
 		    }
-		    return (int) registryGetIdMethod.invokeExact(biomeRegistry, biome);
+		    return (int) registryGetIdMethod.invoke(biomeRegistry, biome);
 		}
 
 		@Override

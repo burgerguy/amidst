@@ -13,6 +13,7 @@
 	</repositories>
 	<properties>
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
+		<graalvm.version>20.2.0</graalvm.version>
 	</properties>
 	<build>
 		<finalName>${amidst.build.filename}</finalName>
@@ -88,6 +89,26 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.graalvm.nativeimage</groupId>
+				<artifactId>native-image-maven-plugin</artifactId>
+				<version>${graalvm.version}</version>
+			    <executions>
+			        <execution>
+			            <goals>
+			                <goal>native-image</goal>
+			            </goals>
+			            <phase>package</phase>
+			        </execution>
+			    </executions>
+			    <configuration>
+			        <skip>false</skip>
+			        <imageName>Amidst</imageName>
+			        <buildArgs>
+			            --no-fallback -H:NativeLinkerOption=prefs.lib -H:IncludeResources=.*src\\main\\resources\\.*$
+			        </buildArgs>
+			    </configuration>
+			</plugin>
 		</plugins>
 	</build>
 	<dependencies>
@@ -123,6 +144,12 @@
 			<version>1.0.0</version>
 			<scope>provided</scope>
 			<type>maven-plugin</type>
+		</dependency>
+		<dependency>
+		    <groupId>org.graalvm.sdk</groupId>
+		    <artifactId>graal-sdk</artifactId>
+		    <version>${graalvm.version}</version>
+		    <scope>provided</scope>
 		</dependency>
 	</dependencies>
 </project>

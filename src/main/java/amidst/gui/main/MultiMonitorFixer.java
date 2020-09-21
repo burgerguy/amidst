@@ -6,9 +6,6 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Window;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 
 import javax.swing.JFrame;
@@ -20,21 +17,20 @@ import amidst.logging.AmidstLogger;
  */
 public class MultiMonitorFixer implements ComponentListener {
 	private final JFrame frame;
-	private final MethodHandle setGCHandle;
+	private final Method setGCMethod;
 	private boolean errorPrinted = false;
 	
 	public MultiMonitorFixer(JFrame frame) {
 		this.frame = frame;
-		this.setGCHandle = getGCHandle();
+		this.setGCMethod = getGCMethod();
 	}
 	
-	private static MethodHandle getGCHandle() {
+	private static Method getGCMethod() {
 		try {
 			Method m1 = Window.class.getDeclaredMethod("setGraphicsConfiguration", GraphicsConfiguration.class);
 			m1.setAccessible(true);
-			MethodHandle mh1 = MethodHandles.lookup().unreflect(m1);
-			return mh1.asType(MethodType.methodType(void.class, JFrame.class, GraphicsConfiguration.class)); // change to allow invokeExact
-		} catch (NoSuchMethodException | IllegalAccessException e) {
+			return m1;
+		} catch (NoSuchMethodException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -64,7 +60,7 @@ public class MultiMonitorFixer implements ComponentListener {
 							&& frame.getLocation().getX() < defaultConfig.getBounds().getMaxX()
 							&& frame.getLocation().getY() >= defaultConfig.getBounds().getMinY()
 							&& frame.getLocation().getY() < defaultConfig.getBounds().getMaxY()) {
-						setGCHandle.invokeExact(frame, defaultConfig);
+						setGCMethod.invoke(frame, defaultConfig);
 					}
 				}
 			}

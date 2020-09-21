@@ -1,7 +1,7 @@
 package amidst.mojangapi.minecraftinterface.legacy;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.Map;
@@ -15,7 +15,6 @@ import amidst.logging.AmidstLogger;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
-import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldType;
@@ -43,13 +42,13 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 	 * getId(Biome) If version >= 18w33a, the signature is: int
 	 * getId(Registry<Biome>, Biome)
 	 */
-	private MethodHandle biomeGetIdMethod;
+	private Method biomeGetIdMethod;
 	
 	/**
 	 * A MethodHandle for getting the quarter resolution
 	 * biome data.
 	 */
-	private MethodHandle getBiomesMethod;
+	private Method getBiomesMethod;
 	
 	/**
 	 * A boolean that is later set to provide whether the
@@ -154,10 +153,10 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		initBiomeGetIdHandle();
 		
 		if(genLayerClass.hasMethod(_1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA)) {
-			getBiomesMethod = ReflectionUtils.getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA);
+			getBiomesMethod = genLayerClass.getMethod(_1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA).getRawMethod();
 			use113GetBiomesMethod = true;
 		} else {
-			getBiomesMethod = ReflectionUtils.getMethodHandle(genLayerClass, _1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA2);
+			getBiomesMethod = genLayerClass.getMethod(_1_13SymbolicNames.METHOD_GEN_LAYER_GET_BIOME_DATA2).getRawMethod();
 		}
 		
 		bootstrapClass.callStaticMethod(register);
@@ -198,9 +197,9 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 		
 		if (registryKeyClass != null && !biomeGetIdMethodReturnsInt) {
 			biomeRegistry = getBiomeRegistry();
-			biomeGetIdMethod = ReflectionUtils.getMethodHandle(registryClass, _1_13SymbolicNames.METHOD_REGISTRY_GET_ID);
+			biomeGetIdMethod = registryClass.getMethod(_1_13SymbolicNames.METHOD_REGISTRY_GET_ID).getRawMethod();
 		} else {
-			biomeGetIdMethod = ReflectionUtils.getMethodHandle(biomeClass, _1_13SymbolicNames.METHOD_BIOME_GET_ID);
+			biomeGetIdMethod = biomeClass.getMethod(_1_13SymbolicNames.METHOD_BIOME_GET_ID).getRawMethod();
 		}
 	}
 
@@ -326,18 +325,18 @@ public class _1_13MinecraftInterface implements MinecraftInterface {
 
 		private Object[] getBiomeData(int x, int y, int width, int height, Object biomeGen) throws Throwable {
 			if(use113GetBiomesMethod) {
-				return (Object[]) getBiomesMethod.invokeExact(biomeGen, x, y, width, height, (Object) null);
+				return (Object[]) getBiomesMethod.invoke(biomeGen, x, y, width, height, (Object) null);
 			} else {
-				return (Object[]) getBiomesMethod.invokeExact(biomeGen, x, y, width, height);
+				return (Object[]) getBiomesMethod.invoke(biomeGen, x, y, width, height);
 			}
 		}
 		
 		private int getBiomeId(Object biome) throws MinecraftInterfaceException {
 			try {
 				if (biomeRegistry != null) {
-					return (int) biomeGetIdMethod.invokeExact(biomeRegistry, biome);
+					return (int) biomeGetIdMethod.invoke(biomeRegistry, biome);
 				} else {
-					return (int) biomeGetIdMethod.invokeExact(biome);
+					return (int) biomeGetIdMethod.invoke(biome);
 				}
 			} catch (Throwable e) {
 				e.printStackTrace();

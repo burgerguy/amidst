@@ -1,7 +1,7 @@
 package amidst.mojangapi.minecraftinterface.legacy;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -13,7 +13,6 @@ import amidst.documentation.ThreadSafe;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
-import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldType;
@@ -35,8 +34,8 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
     private boolean isInitialized = false;
 	private boolean isIntCacheInUse = false;
 
-	private MethodHandle resetIntCacheMethod;
-	private MethodHandle getIntsMethod;
+	private Method resetIntCacheMethod;
+	private Method getIntsMethod;
 
 	LegacyMinecraftInterface(
 			SymbolicClass intCacheClass,
@@ -71,8 +70,8 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
 		}
 		isIntCacheInUse = true;
 		try {
-			resetIntCacheMethod.invokeExact();
-			return (int[]) getIntsMethod.invokeExact(biomeGenerator, x, y, width, height);
+			resetIntCacheMethod.invoke(null);
+			return (int[]) getIntsMethod.invoke(biomeGenerator, x, y, width, height);
 		} catch (Throwable e) {
 			throw new MinecraftInterfaceException("unable to get biome data", e);
 		} finally {
@@ -101,8 +100,8 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
 	    try {
 	    	initializeBlock();
 
-	    	resetIntCacheMethod = ReflectionUtils.getMethodHandle(intCacheClass, LegacySymbolicNames.METHOD_INT_CACHE_RESET_INT_CACHE);
-	    	getIntsMethod = ReflectionUtils.getMethodHandle(genLayerClass, LegacySymbolicNames.METHOD_GEN_LAYER_GET_INTS);
+	    	resetIntCacheMethod = intCacheClass.getMethod(LegacySymbolicNames.METHOD_INT_CACHE_RESET_INT_CACHE).getRawMethod();
+	    	getIntsMethod = genLayerClass.getMethod(LegacySymbolicNames.METHOD_GEN_LAYER_GET_INTS).getRawMethod();
         } catch(IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
             throw new MinecraftInterfaceException("unable to initialize the MinecraftInterface", e);
         }
