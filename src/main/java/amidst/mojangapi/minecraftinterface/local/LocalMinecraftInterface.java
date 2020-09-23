@@ -242,7 +242,6 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 
 		@Override
 		public synchronized MinecraftInterface.WorldAccessor createWorldAccessor() throws MinecraftInterfaceException {
-			if(SUPPORTED_DIMENSIONS != null) throw new MinecraftInterfaceException("test throw");
 			
 		    try {
 		    	long seed = worldOptions.getWorldSeed().getLong();

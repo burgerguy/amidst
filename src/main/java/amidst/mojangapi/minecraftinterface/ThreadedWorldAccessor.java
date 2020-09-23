@@ -21,7 +21,9 @@ public class ThreadedWorldAccessor implements WorldAccessor {
 				try {
 					return innerAccessorFactory.apply(null);
 				} catch (MinecraftInterfaceException e) {
-					return null;
+					// the initial one should have thrown an exception by now,
+					// but we wrap this one in a RuntimeException just in case
+					throw new RuntimeException(e);
 				}
 			} else {
 				return world;
