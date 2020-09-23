@@ -16,6 +16,7 @@ import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
+import amidst.mojangapi.world.WorldOptions;
 import amidst.mojangapi.world.WorldType;
 
 @ThreadSafe
@@ -61,18 +62,11 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
 			symbolicClassMap.get(LegacySymbolicNames.CLASS_GEN_OPTIONS_FACTORY),
 			recognisedVersion);
 	}
-	
+
 	@Override
-	public synchronized WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
+	public synchronized MinecraftInterface.WorldAccessHelper createAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException {
 		initializeIfNeeded();
-		
-		try {
-			Object[] genLayers = getGenLayers(seed, worldType, generatorOptions);
-			return new WorldAccessor(genLayers[0], genLayers[1]);
-		} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-			throw new MinecraftInterfaceException("unable to create world", e);
-		}
+		return new WorldAccessHelper(worldOptions);
 	}
 
 	// Only one thread can manipulate the Minecraft int cache at a time
@@ -154,10 +148,33 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
 	public RecognisedVersion getRecognisedVersion() {
 		return recognisedVersion;
 	}
+	
+	private class WorldAccessHelper implements MinecraftInterface.WorldAccessHelper {
+		private final WorldOptions worldOptions;
+		
+		private WorldAccessHelper(WorldOptions worldOptions) {
+			this.worldOptions = worldOptions;
+		}
+		
+		@Override
+		public Set<Dimension> supportedDimensions() {
+			return Collections.singleton(Dimension.OVERWORLD);
+		}
+
+		@Override
+		public synchronized WorldAccessor createWorldAccessor() throws MinecraftInterfaceException {
+			try {
+				Object[] genLayers = getGenLayers(worldOptions.getWorldSeed().getLong(), worldOptions.getWorldType(), worldOptions.getGeneratorOptions());
+				return new WorldAccessor(genLayers[0], genLayers[1]);
+			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+				throw new MinecraftInterfaceException("unable to create world", e);
+			}
+		}
+	}
 
 	private class WorldAccessor implements MinecraftInterface.WorldAccessor {
-		private final Object quarterResolutionBiomeGenerator;
-		private final Object fullResolutionBiomeGenerator;
+	private final Object quarterResolutionBiomeGenerator;
+	private final Object fullResolutionBiomeGenerator;
 
 		private WorldAccessor(Object quarterResolutionGen, Object fullResolutionGen) {
 			this.quarterResolutionBiomeGenerator = quarterResolutionGen;
@@ -174,11 +191,6 @@ public class LegacyMinecraftInterface implements MinecraftInterface {
 
 			Object biomeGenerator = useQuarterResolution ? quarterResolutionBiomeGenerator : fullResolutionBiomeGenerator;
 			return LegacyMinecraftInterface.this.getBiomeData(x, y, width, height, biomeGenerator, biomeDataMapper);
-		}
-
-		@Override
-		public Set<Dimension> supportedDimensions() {
-			return Collections.singleton(Dimension.OVERWORLD);
 		}
 	}
 }

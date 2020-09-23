@@ -11,7 +11,7 @@ import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.mocking.json.BiomeRequestRecordJson;
 import amidst.mojangapi.world.Dimension;
-import amidst.mojangapi.world.WorldType;
+import amidst.mojangapi.world.WorldOptions;
 
 @ThreadSafe
 public class BenchmarkingMinecraftInterface implements MinecraftInterface {
@@ -22,16 +22,33 @@ public class BenchmarkingMinecraftInterface implements MinecraftInterface {
 		this.inner = inner;
 		this.records = Collections.synchronizedList(records);
 	}
-
+	
 	@Override
-	public MinecraftInterface.WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
-		return new WorldAccessor(inner.createWorldAccessor(seed, worldType, generatorOptions));
+	public MinecraftInterface.WorldAccessHelper createAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException {
+		return new WorldAccessHelper(inner.createAccessHelper(worldOptions));
 	}
 
 	@Override
 	public RecognisedVersion getRecognisedVersion() {
 		return inner.getRecognisedVersion();
+	}
+	
+	private class WorldAccessHelper implements MinecraftInterface.WorldAccessHelper {
+		private final MinecraftInterface.WorldAccessHelper innerAccessHelper;
+
+		private WorldAccessHelper(MinecraftInterface.WorldAccessHelper innerAccessHelper) {
+			this.innerAccessHelper = innerAccessHelper;
+		}
+		
+		@Override
+		public Set<Dimension> supportedDimensions() {
+			return innerAccessHelper.supportedDimensions();
+		}
+		
+		@Override
+		public MinecraftInterface.WorldAccessor createWorldAccessor() throws MinecraftInterfaceException {
+			return new WorldAccessor(innerAccessHelper.createWorldAccessor());
+		}
 	}
 
 	private class WorldAccessor implements MinecraftInterface.WorldAccessor {
@@ -52,11 +69,6 @@ public class BenchmarkingMinecraftInterface implements MinecraftInterface {
 
 				return biomeDataMapper.apply(biomeData);
 			});
-		}
-
-		@Override
-		public Set<Dimension> supportedDimensions() {
-			return innerWorld.supportedDimensions();
 		}
 	}
 }

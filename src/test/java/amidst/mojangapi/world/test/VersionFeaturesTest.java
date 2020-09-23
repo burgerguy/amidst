@@ -10,7 +10,10 @@ import java.util.function.Function;
 
 import org.junit.Test;
 
+import amidst.logging.AmidstLogger;
 import amidst.mojangapi.minecraftinterface.MinecraftInterface;
+import amidst.mojangapi.minecraftinterface.MinecraftInterface.WorldAccessor;
+import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.world.Dimension;
 import amidst.mojangapi.world.WorldOptions;
@@ -38,8 +41,14 @@ public class VersionFeaturesTest {
 
 	public VersionFeatures.Builder createVersionFeaturesBuilder() {
 		WorldOptions worldOptions = new WorldOptions(WorldSeed.fromSaveGame(0), WorldType.DEFAULT);
-		MinecraftInterface.WorldAccessor minecraftWorld = new MockMinecraftWorldAccessor();
-		return DefaultVersionFeatures.builder(worldOptions, minecraftWorld);
+		MinecraftInterface.WorldAccessHelper worldConfig = new MockWorldAccessHelper();
+		MinecraftInterface.WorldAccessor worldAccessor = null;
+		try {
+			worldAccessor = worldConfig.createWorldAccessor();
+		} catch (MinecraftInterfaceException e) {
+			AmidstLogger.crash(e);
+		}
+		return DefaultVersionFeatures.builder(worldOptions, worldConfig, worldAccessor);
 	}
 
 	public List<FeatureKey<?>> getRequiredFeatures() throws IllegalAccessException {
@@ -54,17 +63,26 @@ public class VersionFeaturesTest {
 		}
 		return features;
 	}
-
-	private static class MockMinecraftWorldAccessor implements MinecraftInterface.WorldAccessor {
-		@Override
-		public<T> T getBiomeData(Dimension dimension, int x, int y, int width, int height, boolean useQuarterResolution,
-				Function<int[], T> biomeDataMapper) {
-			throw new UnsupportedOperationException();
-		}
+	
+	private static class MockWorldAccessHelper implements MinecraftInterface.WorldAccessHelper {
 
 		@Override
 		public Set<Dimension> supportedDimensions() {
 			return EnumSet.allOf(Dimension.class);
+		}
+
+		@Override
+		public WorldAccessor createWorldAccessor() {
+			return new MockWorldAccessor();
+		}
+		
+	}
+
+	private static class MockWorldAccessor implements MinecraftInterface.WorldAccessor {
+		@Override
+		public<T> T getBiomeData(Dimension dimension, int x, int y, int width, int height, boolean useQuarterResolution,
+				Function<int[], T> biomeDataMapper) {
+			throw new UnsupportedOperationException();
 		}
 	}
 }

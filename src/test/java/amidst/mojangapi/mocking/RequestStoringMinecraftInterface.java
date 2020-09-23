@@ -8,7 +8,7 @@ import amidst.mojangapi.minecraftinterface.MinecraftInterface;
 import amidst.mojangapi.minecraftinterface.MinecraftInterfaceException;
 import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.world.Dimension;
-import amidst.mojangapi.world.WorldType;
+import amidst.mojangapi.world.WorldOptions;
 
 @ThreadSafe
 public class RequestStoringMinecraftInterface implements MinecraftInterface {
@@ -23,38 +23,49 @@ public class RequestStoringMinecraftInterface implements MinecraftInterface {
 	private void store(Dimension dimension, int x, int y, int width, int height, boolean useQuarterResolution, int[] biomeData) {
 		builder.store(dimension, x, y, width, height, useQuarterResolution, biomeData);
 	}
-
+	
 	@Override
-	public synchronized MinecraftInterface.WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
-		return new WorldAccessor(realMinecraftInterface.createWorldAccessor(seed, worldType, generatorOptions));
+	public MinecraftInterface.WorldAccessHelper createAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException {
+		return new WorldAccessHelper(realMinecraftInterface.createAccessHelper(worldOptions));
 	}
 
 	@Override
-	public synchronized RecognisedVersion getRecognisedVersion() {
+	public RecognisedVersion getRecognisedVersion() {
 		return realMinecraftInterface.getRecognisedVersion();
+	}
+	
+	private class WorldAccessHelper implements MinecraftInterface.WorldAccessHelper {
+		private final MinecraftInterface.WorldAccessHelper realAccessHelper;
+
+		private WorldAccessHelper(MinecraftInterface.WorldAccessHelper realAccessHelper) {
+			this.realAccessHelper = realAccessHelper;
+		}
+		
+		@Override
+		public Set<Dimension> supportedDimensions() {
+			return realAccessHelper.supportedDimensions();
+		}
+		
+		@Override
+		public MinecraftInterface.WorldAccessor createWorldAccessor() throws MinecraftInterfaceException {
+			return new WorldAccessor(realAccessHelper.createWorldAccessor());
+		}
 	}
 
 	private class WorldAccessor implements MinecraftInterface.WorldAccessor {
-		private final MinecraftInterface.WorldAccessor realMinecraftWorld;
+		private final MinecraftInterface.WorldAccessor realWorldAccessor;
 
-		private WorldAccessor(MinecraftInterface.WorldAccessor realMinecraftWorld) {
-			this.realMinecraftWorld = realMinecraftWorld;
+		private WorldAccessor(MinecraftInterface.WorldAccessor realWorldAccessor) {
+			this.realWorldAccessor = realWorldAccessor;
 		}
 
 		@Override
-		public synchronized<T> T getBiomeData(Dimension dimension, int x, int y, int width, int height,
-				boolean useQuarterResolution, Function<int[], T> biomeDataMapper)
-				throws MinecraftInterfaceException {
-			return realMinecraftWorld.getBiomeData(dimension, x, y, width, height, useQuarterResolution, biomeData -> {
+		public<T> T getBiomeData(Dimension dimension, int x, int y, int width, int height,
+				boolean useQuarterResolution, Function<int[], T> biomeDataMapper) throws MinecraftInterfaceException {
+			return realWorldAccessor.getBiomeData(dimension, x, y, width, height, useQuarterResolution, biomeData -> {
 				store(dimension, x, y, width, height, useQuarterResolution, biomeData);
 				return biomeDataMapper.apply(biomeData);
 			});
-		}
-
-		@Override
-		public Set<Dimension> supportedDimensions() {
-			return realMinecraftWorld.supportedDimensions();
 		}
 	}
 }

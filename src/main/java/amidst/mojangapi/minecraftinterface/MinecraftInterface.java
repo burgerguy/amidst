@@ -5,7 +5,7 @@ import java.util.function.Function;
 
 import amidst.documentation.ThreadSafe;
 import amidst.mojangapi.world.Dimension;
-import amidst.mojangapi.world.WorldType;
+import amidst.mojangapi.world.WorldOptions;
 
 /**
  * Acts as an additional layer of abstraction for interfacing with Minecraft.
@@ -17,7 +17,10 @@ import amidst.mojangapi.world.WorldType;
 @ThreadSafe
 public interface MinecraftInterface {
 
-	public WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions) throws MinecraftInterfaceException;
+	/**
+	 * All of the first run initialization stuff should be done here.
+	 */
+	public WorldAccessHelper createAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException;
 
 	public RecognisedVersion getRecognisedVersion();
 
@@ -59,7 +62,22 @@ public interface MinecraftInterface {
 				int x, int y, int width, int height,
 				boolean useQuarterResolution, Function<int[], T> biomeDataMapper)
 				throws MinecraftInterfaceException;
+	}
+	
+	/**
+	 * An interface that includes methods for retrieving and passing all of the
+	 * configuration options needed for the creation of a WorldAccessor.
+	 * 
+	 * This should be able to access methods supplied in the SymbolicClasses just like
+	 * WorldAccessor can.
+	 * 
+	 * This also includes the createWorldAccessor method so it's required to create
+	 * a WorldAccessHelper first.
+	 */
+	public static interface WorldAccessHelper {
 		
 		public Set<Dimension> supportedDimensions();
+		
+		public WorldAccessor createWorldAccessor() throws MinecraftInterfaceException;
 	}
 }

@@ -1,55 +1,71 @@
 package amidst.mojangapi.minecraftinterface;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import amidst.documentation.ThreadSafe;
 import amidst.logging.AmidstLogger;
 import amidst.mojangapi.world.Dimension;
-import amidst.mojangapi.world.WorldType;
+import amidst.mojangapi.world.WorldOptions;
 
 @ThreadSafe
 public class LoggingMinecraftInterface implements MinecraftInterface {
 	private final MinecraftInterface inner;
-	
-	// This is used so we don't log the message every time a thread creates a new WorldAccessor.
-	private final AtomicBoolean shouldLogAccessor = new AtomicBoolean(true);
 
 	public LoggingMinecraftInterface(MinecraftInterface minecraftInterface) {
 		this.inner = minecraftInterface;
 	}
-	
+
 	@Override
-	public WorldAccessor createWorldAccessor(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
-		WorldAccessor innerAccessor;
+	public MinecraftInterface.WorldAccessHelper createAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException {
+		MinecraftInterface.WorldAccessHelper config = new WorldAccessHelper(worldOptions);
 		
-		if(shouldLogAccessor.getAndSet(false)) {
-			AmidstLogger.info("Creating world with seed '{}' and type '{}'", seed, worldType.getName());
-			AmidstLogger.info("Using the following generator options: {}", generatorOptions);
-			
-			innerAccessor = inner.createWorldAccessor(seed, worldType, generatorOptions);
-			
-			StringBuilder sb = new StringBuilder("Supported dimensions for world: ");
-			boolean firstDim = true;
-			for(Dimension dimension : innerAccessor.supportedDimensions()) {
-				if(firstDim) {
-					firstDim = false;
-				} else {
-					sb.append(", ");
-				}
-				
-				sb.append(dimension.getDisplayName());
+		StringBuilder sb = new StringBuilder("Supported dimensions for world configuration: ");
+		boolean firstDim = true;
+		for(Dimension dimension : config.supportedDimensions()) {
+			if(firstDim) {
+				firstDim = false;
+			} else {
+				sb.append(", ");
 			}
-			AmidstLogger.info(sb.toString());
-		} else {
-			innerAccessor = inner.createWorldAccessor(seed, worldType, generatorOptions);
+			
+			sb.append(dimension.getDisplayName());
 		}
+		AmidstLogger.info(sb.toString());
 		
-		return innerAccessor;
+		return config;
 	}
 
 	@Override
 	public RecognisedVersion getRecognisedVersion() {
 		return inner.getRecognisedVersion();
+	}
+
+	private class WorldAccessHelper implements MinecraftInterface.WorldAccessHelper {
+		private final MinecraftInterface.WorldAccessHelper innerAccessHelper;
+		private final WorldOptions worldOptions;
+		
+		// This is used so we don't log the message every time a thread creates a new WorldAccessor.
+		private final AtomicBoolean shouldLogAccessor = new AtomicBoolean(true);
+		
+		private WorldAccessHelper(WorldOptions worldOptions) throws MinecraftInterfaceException {
+			this.innerAccessHelper = inner.createAccessHelper(worldOptions);
+			this.worldOptions = worldOptions;
+		}
+
+		@Override
+		public Set<Dimension> supportedDimensions() {
+			return innerAccessHelper.supportedDimensions();
+		}
+
+		@Override
+		public WorldAccessor createWorldAccessor() throws MinecraftInterfaceException {
+			if(shouldLogAccessor.getAndSet(false)) {
+				AmidstLogger.info("Creating world with seed '{}' and type '{}'", worldOptions.getWorldSeed().getLong(), worldOptions.getWorldType().getName());
+				AmidstLogger.info("Using the following generator options: {}", worldOptions.getGeneratorOptions());
+			}
+			
+			return innerAccessHelper.createWorldAccessor();
+		}
 	}
 }
