@@ -332,9 +332,13 @@ public enum FabricSetup {
 			
 			mappingsFile = mappingsDir.resolve("yarn-" + rawGameVersion + "+build." + buildVer + fileEnding);
 			if (DEBUG_LOGGING) AmidstLogger.debug("Downloading yarn mappings " + rawGameVersion + " build " + buildVer + "...");
-			ReadableByteChannel readableByteChannel = Channels.newChannel(new URL("https://maven.fabricmc.net/net/fabricmc/yarn/" + rawGameVersion + "%2Bbuild." + buildVer + "/yarn-" + rawGameVersion + "%2Bbuild." + buildVer + fileEnding).openStream());
-			try (FileOutputStream fileOutputStream = new FileOutputStream(mappingsFile.toAbsolutePath().toString())) {
-				fileOutputStream.getChannel().transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+			
+			try (ReadableByteChannel readableByteChannel = Channels.newChannel(
+					new URL("https://maven.fabricmc.net/net/fabricmc/yarn/" + rawGameVersion + "%2Bbuild." + buildVer
+							+ "/yarn-" + rawGameVersion + "%2Bbuild." + buildVer + fileEnding).openStream())) {
+				try (FileOutputStream fileOutputStream = new FileOutputStream(mappingsFile.toAbsolutePath().toString())) {
+					fileOutputStream.getChannel().transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+				}
 			}
 			
 			if (DEBUG_LOGGING) AmidstLogger.debug("Yarn mappings saved to " + mappingsFile.toAbsolutePath().toString());
