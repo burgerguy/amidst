@@ -28,6 +28,7 @@ import org.spongepowered.asm.launch.MixinBootstrap;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import amidst.logging.AmidstLogger;
+import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import io.github.classgraph.ClassGraph;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.FabricLoader;
@@ -117,13 +118,17 @@ public enum FabricSetup {
 			AmidstLogger.error("Unable to add URLs to classpath");
 		}
 		
-		addYarnToClasspath(provider, knot, "-mergedv2.jar");
+		boolean mergedMappings = RecognisedVersion.isNewerOrEqualTo(RecognisedVersion.fromName(provider.getRawGameVersion()), RecognisedVersion._20w10a);
+		addYarnToClasspath(provider, knot, mergedMappings ? "-mergedv2.jar" : ".jar");
+		
+		String gameId = provider.getGameId();
+		String gameVersion = provider.getNormalizedGameVersion();
 		
 		if (provider.isObfuscated()) {
 			for (Path path : provider.getGameContextJars()) {
 				deobfuscate(
-					provider.getGameId(),
-					provider.getNormalizedGameVersion(),
+					gameId,
+					gameVersion,
 					provider.getLaunchDirectory(),
 					path,
 					knot
@@ -131,7 +136,7 @@ public enum FabricSetup {
 			}
 		}
 		
-		Path intermediaryJarPath = provider.getLaunchDirectory().resolve(".fabric" + File.separatorChar + "remappedJars" + File.separatorChar + provider.getGameId() + "-" + provider.getRawGameVersion() + File.separatorChar + knot.getTargetNamespace() + "-" + provider.getRawGameVersion() + ".jar").toAbsolutePath();
+		Path intermediaryJarPath = provider.getLaunchDirectory().resolve(".fabric" + File.separatorChar + "remappedJars" + File.separatorChar + (gameVersion.isEmpty() ? gameId : String.format("%s-%s", gameId, gameVersion)) + File.separatorChar + knot.getTargetNamespace() + "-" + provider.getRawGameVersion() + ".jar").toAbsolutePath();
 		
 		// FABRIC DOC: Locate entrypoints before switching class loaders
 		// Read documentation at the setContextClassLoader() for more info as to why
