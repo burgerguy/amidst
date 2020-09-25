@@ -167,6 +167,11 @@ public enum FabricSetup {
 		MixinEnvironment env = MixinEnvironment.getDefaultEnvironment();
 		if (DEBUG_LOGGING) env.setOption(MixinEnvironment.Option.DEBUG_VERBOSE, true);
 		
+//		env.setOption(MixinEnvironment.Option.REFMAP_REMAP, true);
+//		System.setProperty("mixin.env.remapRefMap", "true");
+//		MixinIntermediaryDevRemapper remapper = new MixinIntermediaryDevRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), "intermediary", "official");
+//		env.getRemappers().add(remapper);
+		
 		FabricMixinBootstrap.init(ENVIRONMENT_TYPE, loader);
 		finishMixinBootstrapping();
 		
