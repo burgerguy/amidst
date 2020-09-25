@@ -128,52 +128,12 @@ public class SymbolicClassBuilder {
 		result.setAccessible(true);
 		return result;
 	}
-	
+
 	private Method getMethod(Class<?> clazz, String realName, Class<?>[] parameterClasses) throws NoSuchMethodException {
 		Method result = clazz.getDeclaredMethod(realName, parameterClasses);
 		result.setAccessible(true);
 		return result;
 	}
-
-//	private Method getMethod(Class<?> clazz, String realName, Class<?>[] parameterClasses, String symbolicName)
-//			throws NoSuchMethodException {
-//		List<Method> results = new ArrayList<>();
-//		for(Method possibleMethod : clazz.getDeclaredMethods()) {
-//			boolean isCorrect = true;
-//			Class<?>[] possibleTypes = possibleMethod.getParameterTypes();
-//			if(possibleTypes.length != parameterClasses.length) {
-//				isCorrect = false;
-//			} else {
-//				for (int i = 0; i < possibleTypes.length; i++) {
-//					if(!possibleTypes[i].equals(parameterClasses[i])) {
-//						isCorrect = false;
-//						break;
-//					}
-//				}
-//			}
-//			
-//			if (isCorrect) {
-//				results.add(possibleMethod);
-//			}
-//		}
-//		Method result = getClosestMethodByName(results, symbolicName);
-//		result.setAccessible(true);
-//		return result;
-//	}
-//	
-//	private Method getClosestMethodByName(List<Method> methods, String targetName) {
-//		Method closestMethod = null;
-//		int closestValue = Integer.MAX_VALUE;
-//		for (Method m : methods) {
-//			int calculatedValue = LevenshteinAlgorithm.ld(m.getName(), targetName);
-//			if (calculatedValue < closestValue) {
-//				closestMethod = m;
-//				closestValue = calculatedValue;
-//			}
-//		}
-//		
-//		return closestMethod;
-//	}
 
 	private Field getField(Class<?> clazz, String realName) throws NoSuchFieldException {
 		Field result = clazz.getDeclaredField(realName);
