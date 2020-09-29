@@ -119,7 +119,11 @@ public enum FabricSetup {
 		}
 		
 		boolean mergedMappings = RecognisedVersion.isNewerOrEqualTo(RecognisedVersion.fromName(provider.getRawGameVersion()), RecognisedVersion._20w10a);
-		addYarnToClasspath(provider, knot, mergedMappings ? "-mergedv2.jar" : ".jar");
+		 if (tryAddYarnToClasspath(provider, knot, mergedMappings ? "-mergedv2.jar" : ".jar")) {
+			 AmidstLogger.info("Finished setting up yarn mappings");
+		 } else {
+			 throw new UnsupportedOperationException("Minecraft version incompatible with Fabric");
+		 }
 		
 		String gameId = provider.getGameId();
 		String gameVersion = provider.getNormalizedGameVersion();
@@ -305,7 +309,7 @@ public enum FabricSetup {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static void addYarnToClasspath(GameProvider provider, Knot knot, String fileEnding) throws Throwable {
+	private static boolean tryAddYarnToClasspath(GameProvider provider, Knot knot, String fileEnding) throws Throwable {
 		Path mappingsDir = provider.getLaunchDirectory().resolve(".fabric" + File.separatorChar + "mappings");
 		String rawGameVersion = provider.getRawGameVersion();
 		
@@ -317,7 +321,7 @@ public enum FabricSetup {
 				String fileName = file.getFileName().toString();
 				String fileNameStart = "yarn-" + rawGameVersion + "+build.";
 				if (!Files.isDirectory(file) && fileName.contains(fileNameStart) && fileName.contains(fileEnding)) {
-					int possibleBuildVer = Integer.parseInt(fileName.substring(fileNameStart.length(), fileName.indexOf(fileEnding))); // 12 is the amount of extra characters around the version before the build no.
+					int possibleBuildVer = Integer.parseInt(fileName.substring(fileNameStart.length(), fileName.indexOf(fileEnding)));
 					if (possibleBuildVer > buildVer) {
 						buildVer = possibleBuildVer;
 						mappingsFile = file;
@@ -337,7 +341,11 @@ public enum FabricSetup {
 			try (InputStreamReader versionsReader = new InputStreamReader(new URL("https://maven.fabricmc.net/net/fabricmc/yarn/versions.json").openStream())) {
 				JSONObject versionsRoot = (JSONObject) JSONValue.parse(versionsReader);
 				JSONArray buildsArray = (JSONArray) versionsRoot.get(rawGameVersion);
-				buildVer = Collections.max((List<Long>) buildsArray).intValue();
+				if(buildsArray != null) {
+					buildVer = Collections.max((List<Long>) buildsArray).intValue();
+				} else {
+					return false;
+				}
 			}
 			
 			mappingsFile = mappingsDir.resolve("yarn-" + rawGameVersion + "+build." + buildVer + fileEnding);
@@ -374,6 +382,7 @@ public enum FabricSetup {
 		// Add to knot class loader
 		knot.propose(mappingsURL);
 		
+		return true;
 	}
 	
 }
