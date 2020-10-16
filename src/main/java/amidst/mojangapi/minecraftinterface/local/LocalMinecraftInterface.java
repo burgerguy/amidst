@@ -26,6 +26,7 @@ import amidst.mojangapi.minecraftinterface.RecognisedVersion;
 import amidst.mojangapi.minecraftinterface.ReflectionUtils;
 import amidst.mojangapi.minecraftinterface.UnsupportedDimensionException;
 import amidst.mojangapi.world.Dimension;
+import amidst.mojangapi.world.WorldOptions;
 import amidst.mojangapi.world.WorldType;
 import amidst.util.ArrayCache;
 
@@ -34,8 +35,8 @@ import net.fabricmc.loader.entrypoint.minecraft.hooks.EntrypointUtils;
 
 public class LocalMinecraftInterface implements MinecraftInterface {
 
-	private static String STRING_WITH_ZERO_HASHCODE = "drumwood boulderhead";
-	private static Set<Dimension> SUPPORTED_DIMENSIONS = Collections.unmodifiableSet(EnumSet.of(Dimension.OVERWORLD, Dimension.NETHER));
+	private static final String STRING_WITH_ZERO_HASHCODE = "drumwood boulderhead";
+	private static final Set<Dimension> SUPPORTED_DIMENSIONS = Collections.unmodifiableSet(EnumSet.of(Dimension.OVERWORLD, Dimension.NETHER));
 
     private boolean isInitialized = false;
 	private final RecognisedVersion recognisedVersion;
@@ -77,12 +78,13 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 	}
 
 	@Override
-	public synchronized MinecraftInterface.World createWorld(long seed, WorldType worldType, String generatorOptions)
-			throws MinecraftInterfaceException {
-	    initializeIfNeeded();
-
+	public synchronized MinecraftInterface.WorldAccessor createWorldAccessor(WorldOptions worldOptions) throws MinecraftInterfaceException {
+		initializeIfNeeded();
+		
 	    try {
-	    	Object worldSettings = createWorldSettingsObject(seed, worldType, generatorOptions).getObject();
+	    	long seed = worldOptions.getWorldSeed().getLong();
+	    	
+	    	Object worldSettings = createWorldSettingsObject(seed, worldOptions.getWorldType(), worldOptions.getGeneratorOptions()).getObject();
 	    	Object overworldBiomeProvider;
 	    	Object netherBiomeProvider;
 	    	if (dimensionSettingsClass == null) {
@@ -97,7 +99,7 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 
             long seedForBiomeZoomer = makeSeedForBiomeZoomer(seed);
 	        Object biomeZoomer = biomeZoomerClass.getClazz().getEnumConstants()[0];
-            return new World(overworldBiomeProvider, netherBiomeProvider, biomeZoomer, seedForBiomeZoomer);
+            return new WorldAccessor(overworldBiomeProvider, netherBiomeProvider, biomeZoomer, seedForBiomeZoomer);
 
         } catch(RuntimeException | IllegalAccessException | InvocationTargetException e) {
             throw new MinecraftInterfaceException("unable to create world", e);
@@ -250,7 +252,7 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 		return resourceKeyClass.callConstructor(SymbolicNames.CONSTRUCTOR_RESOURCE_KEY, key).getObject();
 	}
 
-	private class World implements MinecraftInterface.World {
+	private class WorldAccessor implements MinecraftInterface.WorldAccessor {
 		/**
 		 * A BiomeProvider instance for the current overworld, giving
 		 * access to the quarter-scale biome data.
@@ -272,7 +274,7 @@ public class LocalMinecraftInterface implements MinecraftInterface {
 	     */
 		private final long seedForBiomeZoomer;
 
-	    private World(Object overworldBiomeProvider, Object netherBiomeProvider, Object biomeZoomer, long seedForBiomeZoomer) {
+	    private WorldAccessor(Object overworldBiomeProvider, Object netherBiomeProvider, Object biomeZoomer, long seedForBiomeZoomer) {
 	    	this.seedForBiomeZoomer = seedForBiomeZoomer;
 	    	this.overworldBiomeProvider = Objects.requireNonNull(overworldBiomeProvider);
 	    	this.netherBiomeProvider = Objects.requireNonNull(netherBiomeProvider);
