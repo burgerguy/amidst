@@ -139,12 +139,6 @@
 				<type>maven-plugin</type>
 			</dependency>
 			<dependency>
-				<groupId>com.googlecode.json-simple</groupId>
-				<artifactId>json-simple</artifactId>
-				<version>1.1.1</version>
-				<scope>runtime</scope>
-			</dependency>
-			<dependency>
 				<groupId>com.github.classgraph</groupId>
 				<artifactId>classgraph</artifactId>
 				<version>classgraph-4.8.88</version>
@@ -183,11 +177,6 @@
 			<artifactId>properties-maven-plugin</artifactId>
 			<scope>provided</scope>
 			<type>maven-plugin</type>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.json-simple</groupId>
-			<artifactId>json-simple</artifactId>
-			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.github.classgraph</groupId>
@@ -229,6 +218,16 @@
 			<groupId>net.fabricmc</groupId>
 			<artifactId>tiny-remapper</artifactId>
 			<version>0.3.0.70</version>
+		</dependency>
+		<dependency>
+			<groupId>net.fabricmc</groupId>
+			<artifactId>fabric-loom</artifactId>
+			<version>0.5.9</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.zeroturnaround</groupId>
+		    <artifactId>zt-zip</artifactId>
+		    <version>1.14</version>
 		</dependency>
 	</dependencies>
 </project>

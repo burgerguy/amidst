@@ -48,7 +48,8 @@ public enum RealClasses {
 			throws IOException,
 			RealClassCreationException {
 		for (Path path: (Iterable<Path>) Files.list(directory)::iterator) {
-			String realClassName = getPathWithoutExtension(path.toString(), "class");
+			//String realClassName = getPathWithoutExtension(path.toString(), "class");
+			String realClassName = getFileNameWithoutExtension(path.getFileName().toString(), "class");
 			if (Files.isDirectory(path)) {
 				readJarFileDirectory(path, result);
 			} else if (realClassName != null) {

@@ -1,7 +1,7 @@
 package amidst.mojangapi.minecraftinterface;
 
+import java.io.File;
 import java.net.URLClassLoader;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.BiFunction;
 
@@ -32,14 +32,12 @@ public enum MinecraftInterfaces {
             RecognisedVersion recognisedVersion = RecognisedVersion.from(classLoader);
             
     		AmidstLogger.info("Loading fabric...");
-    		Object[] fabricObjects = FabricSetup.initAndGetObjects(classLoader, launcherProfile.getJar());
-    		ClassLoader knotClassLoader = (ClassLoader) fabricObjects[0];
-    		Path intermediaryJar = (Path) fabricObjects[1];
+    		ClassLoader knotClassLoader = FabricSetup.initAndGetClassLoader(classLoader, launcherProfile.getJar());
     		AmidstLogger.info("Fabric load complete.");
     		
             Factory factory = fromVersion(recognisedVersion);
             Map<String, SymbolicClass> symbolicClassMap = Classes
-                    .createSymbolicClassMap(intermediaryJar, knotClassLoader, factory.classTranslator);
+                    .createSymbolicClassMap(launcherProfile.getJar(), knotClassLoader, factory.classTranslator);
             MinecraftInterface minecraftInterface = factory.factory.apply(symbolicClassMap, recognisedVersion);
 
             AmidstLogger.info("Minecraft load complete.");
