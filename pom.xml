@@ -187,7 +187,7 @@
 		<dependency>
 			<groupId>net.fabricmc</groupId>
 			<artifactId>fabric-loader</artifactId>
-			<version>0.9.3+build.207</version>
+			<version>0.10.5+build.213</version>
 		</dependency>
 		<dependency>
 			<groupId>net.fabricmc</groupId>
@@ -205,11 +205,6 @@
 			<version>2.13.3</version>
 		</dependency>
 		<dependency>
-			<groupId>com.google.jimfs</groupId>
-			<artifactId>jimfs</artifactId>
-			<version>1.1</version>
-		</dependency>
-		<dependency>
 			<groupId>net.fabricmc</groupId>
 			<artifactId>tiny-mappings-parser</artifactId>
 			<version>0.2.2.14</version>
@@ -218,16 +213,6 @@
 			<groupId>net.fabricmc</groupId>
 			<artifactId>tiny-remapper</artifactId>
 			<version>0.3.0.70</version>
-		</dependency>
-		<dependency>
-			<groupId>net.fabricmc</groupId>
-			<artifactId>fabric-loom</artifactId>
-			<version>0.5.9</version>
-		</dependency>
-		<dependency>
-		    <groupId>org.zeroturnaround</groupId>
-		    <artifactId>zt-zip</artifactId>
-		    <version>1.14</version>
 		</dependency>
 	</dependencies>
 </project>

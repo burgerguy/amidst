@@ -56,6 +56,7 @@ import net.fabricmc.loader.util.mappings.MixinIntermediaryDevRemapper;
 import net.fabricmc.loader.util.mappings.TinyRemapperMappingsHelper;
 import net.fabricmc.loom.util.accesswidener.AccessWidener;
 import net.fabricmc.loom.util.accesswidener.AccessWidenerRemapper;
+import net.fabricmc.tinyremapper.InputTag;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 
@@ -317,6 +318,7 @@ public enum FabricSetup {
 		boolean firstRemap = true;
 		TinyRemapper remapper = null;
 		Remapper asmRemapper = null;
+		InputTag inputTag = null;
 		
 		Path remappedModsDir = provider.getLaunchDirectory().resolve("mods");
 		Files.createDirectories(remappedModsDir);
@@ -327,10 +329,13 @@ public enum FabricSetup {
 		
 		for (Path modPath : (Iterable<Path>)(() -> modPathIterator)) {
 			if (Files.isDirectory(modPath)) continue;
+			
 			String[] filenameSplits = modPath.getFileName().toString().split("(?=\\.)");
 			String extension = filenameSplits[filenameSplits.length - 1];
+			
 			if (!extension.equals(".jar")) continue;
 			StringBuilder filenameBuilder = new StringBuilder();
+			
 			for (int i = 0; i < filenameSplits.length - 1; i++) {
 				filenameBuilder.append(filenameSplits[i]);
 			}
@@ -372,6 +377,7 @@ public enum FabricSetup {
 								toNamespace
 						)).build();
 				remapper.readClassPath(knotClassPath);
+				inputTag = remapper.createInputTag();
 				asmRemapper = remapper.getRemapper();
 				
 				firstRemap = false;
@@ -380,8 +386,8 @@ public enum FabricSetup {
 			AmidstLogger.info("Remapping mod " + modPath.getFileName());
 			
 			try (OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(newPath).build()) {
-				remapper.readInputs(modPath);
-				remapper.apply(outputConsumer);
+				remapper.readInputs(inputTag, modPath);
+				remapper.apply(outputConsumer, inputTag);
 				outputConsumer.addNonClassFiles(modPath);
 			} catch (Exception e) {
 				remapper.finish();
