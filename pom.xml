@@ -192,7 +192,7 @@
 		<dependency>
 			<groupId>net.fabricmc</groupId>
 			<artifactId>sponge-mixin</artifactId>
-			<version>0.8.1+build.21</version>
+			<version>0.8.2+build.24</version>
 		</dependency>
 		<dependency>
 			<groupId>net.fabricmc</groupId>
@@ -205,6 +205,11 @@
 			<version>2.13.3</version>
 		</dependency>
 		<dependency>
+			<groupId>com.google.jimfs</groupId>
+			<artifactId>jimfs</artifactId>
+			<version>1.2-fabric</version>
+		</dependency>
+		<dependency>
 			<groupId>net.fabricmc</groupId>
 			<artifactId>tiny-mappings-parser</artifactId>
 			<version>0.2.2.14</version>
@@ -213,6 +218,36 @@
 			<groupId>net.fabricmc</groupId>
 			<artifactId>tiny-remapper</artifactId>
 			<version>0.3.0.70</version>
+		</dependency>
+		<dependency>
+			<groupId>net.fabricmc</groupId>
+			<artifactId>fabric-loom</artifactId>
+			<version>0.5.9</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-analysis</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-commons</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-tree</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-util</artifactId>
+			<version>9.0</version>
 		</dependency>
 	</dependencies>
 </project>

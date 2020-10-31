@@ -1,38 +1,29 @@
 package amidst.clazz.fabric;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
-import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipFile;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.config.Configurator;
-import org.objectweb.asm.commons.Remapper;
 import org.spongepowered.asm.launch.MixinBootstrap;
 import org.spongepowered.asm.mixin.MixinEnvironment;
-import org.zeroturnaround.zip.ZipUtil;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -44,27 +35,28 @@ import io.github.classgraph.ClassGraph;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.FabricLoader;
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint;
+import net.fabricmc.loader.discovery.ClasspathModCandidateFinder;
+import net.fabricmc.loader.discovery.DirectoryModCandidateFinder;
+import net.fabricmc.loader.discovery.ModCandidate;
+import net.fabricmc.loader.discovery.ModResolutionException;
+import net.fabricmc.loader.discovery.ModResolver;
 import net.fabricmc.loader.entrypoint.EntrypointTransformer;
 import net.fabricmc.loader.entrypoint.minecraft.hooks.EntrypointUtils;
 import net.fabricmc.loader.game.GameProvider;
 import net.fabricmc.loader.game.GameProviders;
-import net.fabricmc.loader.launch.common.FabricLauncher;
+import net.fabricmc.loader.gui.FabricGuiEntry;
 import net.fabricmc.loader.launch.common.FabricLauncherBase;
 import net.fabricmc.loader.launch.common.FabricMixinBootstrap;
 import net.fabricmc.loader.launch.knot.Knot;
 import net.fabricmc.loader.util.mappings.MixinIntermediaryDevRemapper;
-import net.fabricmc.loader.util.mappings.TinyRemapperMappingsHelper;
-import net.fabricmc.loom.util.accesswidener.AccessWidener;
-import net.fabricmc.loom.util.accesswidener.AccessWidenerRemapper;
-import net.fabricmc.tinyremapper.InputTag;
-import net.fabricmc.tinyremapper.OutputConsumerPath;
-import net.fabricmc.tinyremapper.TinyRemapper;
 
 public enum FabricSetup {
 	;
 	private static final EnvType ENVIRONMENT_TYPE = EnvType.CLIENT;
 	private static final boolean DEVELOPMENT = false; // if this is set to true then all normally compiled mods break
 	private static final boolean DEBUG_LOGGING = Boolean.getBoolean("amidst.fabric.debug");
+	private static final boolean RUNTIME_REMAPPING = true;
+	private static final boolean DEBUG_DUMPING = false;
 	private static final String fromNamespace = "intermediary";
 	private static final String toNamespace = "official";
 	
@@ -96,9 +88,9 @@ public enum FabricSetup {
 		
 		// Reflect classloader instance
 		// we need a url class loader so we can later obtain its classpath
-		Constructor<?> constructor = Class.forName("net.fabricmc.loader.launch.knot.KnotCompatibilityClassLoader").getDeclaredConstructors()[0];
+		Constructor<?> constructor = Class.forName("net.fabricmc.loader.launch.knot.KnotClassLoader").getDeclaredConstructors()[0];
 		constructor.setAccessible(true);
-		URLClassLoader knotClassLoader = (URLClassLoader) constructor.newInstance(DEVELOPMENT, ENVIRONMENT_TYPE, provider);
+		ClassLoader knotClassLoader = (ClassLoader) constructor.newInstance(DEVELOPMENT, ENVIRONMENT_TYPE, provider);
 		
 		setProperties(new HashMap<>());
 		
@@ -113,9 +105,12 @@ public enum FabricSetup {
 		// Get all of the classes in the system classloader to check against
 		URL[] systemClassPath = getSystemClasspathUrls();
 		
+		URL gameJarUrl = clientJarPath.toUri().toURL();
+		
 		// Merge given classloader into new KnotClassLoader
+		URL[] providedClassPath = ucl.getURLs();
 		try {		    
-			for (URL url : ucl.getURLs()) { // given class loader
+			for (URL url : providedClassPath) { // given class loader
 				String urlString = url.toString().toLowerCase();
 				if (!hasMatchingUrl(url, systemClassPath)
 				 && !urlString.contains("fabric")
@@ -123,7 +118,7 @@ public enum FabricSetup {
 				 && !urlString.contains("asm")
 				 && !urlString.contains("log4j")
 				 && !urlString.contains("gson")
-				 && !url.sameFile(clientJarPath.toUri().toURL())) {
+				 && !url.sameFile(gameJarUrl)) {
 					knot.propose(url);
 				} else {
 					if (DEBUG_LOGGING) AmidstLogger.debug("Rejected URL: " + url);
@@ -140,8 +135,6 @@ public enum FabricSetup {
 		} else {
 			throw new UnsupportedOperationException("Minecraft version incompatible with Fabric");
 		}
-		
-		tryRemapAllMods(provider, clientJarPath, knotClassLoader, knot);
 		
 		// FABRIC DOC: Locate entrypoints before switching class loaders
 		// Read documentation at the setContextClassLoader() for more info as to why
@@ -163,7 +156,8 @@ public enum FabricSetup {
 		FabricLoader loader = FabricLoader.INSTANCE;
 		setMappingResolverNamespace(loader, toNamespace);
 		loader.setGameProvider(provider);
-		loader.load();
+//		loader.load();
+		setupLoader(loader, provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl);
 		loader.freeze();
 		
 		loader.getAccessWidener().loadFromMods();
@@ -176,6 +170,12 @@ public enum FabricSetup {
 		env.setOption(MixinEnvironment.Option.REFMAP_REMAP, true);
 		MixinIntermediaryDevRemapper remapper = new MixinIntermediaryDevRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
 		env.getRemappers().add(remapper);
+//		env.setOption(MixinEnvironment.Option.REFMAP_REMAP_ALLOW_PERMISSIVE, true);
+		
+		if (DEBUG_DUMPING) {
+			env.setOption(MixinEnvironment.Option.DEBUG_EXPORT, true);
+			env.setOption(MixinEnvironment.Option.DUMP_TARGET_ON_FAILURE, true);
+		}
 		
 		FabricMixinBootstrap.init(ENVIRONMENT_TYPE, loader);
 		finishMixinBootstrapping();
@@ -185,6 +185,7 @@ public enum FabricSetup {
 		if (DEBUG_LOGGING) listAllEntrypoints(loader);
 		
 		EntrypointUtils.invoke("preLaunch", PreLaunchEntrypoint.class, PreLaunchEntrypoint::onPreLaunch);
+		
 		loadEntrypoint(provider, ENVIRONMENT_TYPE, knotClassLoader); // This is done to imitate what fabric loader would be doing at
 																 // this stage. After invoking the preLaunch entrypoint, it loads
 																 // the main Minecraft class and invokes the main, where the main
@@ -219,12 +220,6 @@ public enum FabricSetup {
 		return (Knot) constructor.newInstance(type, gameJarFile);
 	}
 	
-	private static void deobfuscate(String gameId, String gameVersion, Path gameDir, Path jarFile, FabricLauncher launcher) throws Throwable {
-		Method m = FabricLauncherBase.class.getDeclaredMethod("deobfuscate", String.class, String.class, Path.class, Path.class, FabricLauncher.class);
-		m.setAccessible(true);
-		m.invoke(null, gameId, gameVersion, gameDir, jarFile, launcher);
-	}
-	
 	private static void finishMixinBootstrapping() throws Throwable{
 		Method m = FabricLauncherBase.class.getDeclaredMethod("finishMixinBootstrapping");
 		m.setAccessible(true);
@@ -245,6 +240,46 @@ public enum FabricSetup {
 		f3.set(knot, provider);
 	}
 	
+	private static void setupLoader(FabricLoader loader, GameProvider provider, ClassLoader knotClassLoader,
+			URL[] systemClassPath, URL[] providedClassPath, URL gameJarUrl) throws Throwable {
+		try {			
+			ModResolver resolver = new ModResolver();
+			resolver.addCandidateFinder(new ClasspathModCandidateFinder());
+			resolver.addCandidateFinder(new DirectoryModCandidateFinder(loader.getModsDir(), RUNTIME_REMAPPING));
+			Map<String, ModCandidate> candidateMap = resolver.resolve(loader);
+
+			String modText;
+			switch (candidateMap.values().size()) {
+				case 0:
+					modText = "Loading {} mods";
+					break;
+				case 1:
+					modText = "Loading {} mod: {}";
+					break;
+				default:
+					modText = "Loading {} mods: {}";
+					break;
+			}
+
+			AmidstLogger.info("[FabricSetup] " + modText, candidateMap.values().size(), candidateMap.values().stream()
+				.map(info -> String.format("%s@%s", info.getInfo().getId(), info.getInfo().getVersion().getFriendlyString()))
+				.collect(Collectors.joining(", ")));
+			
+			Method addModMethod = FabricLoader.class.getDeclaredMethod("addMod", ModCandidate.class);
+			addModMethod.setAccessible(true);
+			
+			for (ModCandidate candidate : CustomRuntimeModRemapper.remap(fromNamespace, toNamespace, candidateMap.values(), ModResolver.getInMemoryFs(), provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl)) {
+				// The biome api is excluded because it always fails at appendNetherBiomes after 1.16.2.
+				if (!candidate.getInfo().getId().equals("fabric-biome-api-v1")) {
+					addModMethod.invoke(loader, candidate);
+				}
+			}
+			
+		} catch (ModResolutionException exception) {
+			FabricGuiEntry.displayCriticalError(exception, true);
+		}
+	}
+	
 	private static void loadEntrypoint(GameProvider provider, EnvType envType, ClassLoader loader) throws Throwable {
 		String targetClass = provider.getEntrypoint();
 		
@@ -254,13 +289,6 @@ public enum FabricSetup {
 		
 		if(DEBUG_LOGGING) AmidstLogger.debug("Loading GameProvider entrypoint: " + targetClass);
 		loader.loadClass(targetClass);
-	}
-	
-	@SuppressWarnings("unused")
-	private static void setGameDir(FabricLoader loader, Path newDir) throws Throwable {
-		Method m1 = FabricLoader.class.getDeclaredMethod("setGameDir", Path.class);
-		m1.setAccessible(true);
-		m1.invoke(loader, newDir);
 	}
 	
 	// We use ClassGraph instead of just converting the system classloader to a
@@ -312,128 +340,6 @@ public enum FabricSetup {
 		Field f2 = EntrypointTransformer.class.getDeclaredField("patchedClasses");
 		f2.setAccessible(true);
 		f2.set(transformer, new HashMap<>());
-	}
-	
-	private static void tryRemapAllMods(GameProvider provider, Path clientJarPath, URLClassLoader knotClassLoader, Knot knot) throws Throwable {
-		boolean firstRemap = true;
-		TinyRemapper remapper = null;
-		Remapper asmRemapper = null;
-		InputTag inputTag = null;
-		
-		Path remappedModsDir = provider.getLaunchDirectory().resolve("mods");
-		Files.createDirectories(remappedModsDir);
-		Path unmappedModsDir = provider.getLaunchDirectory().resolve("unmappedMods");
-		Files.createDirectories(unmappedModsDir);
-		
-		Iterator<Path> modPathIterator = Files.list(provider.getLaunchDirectory().resolve("unmappedMods")).iterator();
-		
-		for (Path modPath : (Iterable<Path>)(() -> modPathIterator)) {
-			if (Files.isDirectory(modPath)) continue;
-			
-			String[] filenameSplits = modPath.getFileName().toString().split("(?=\\.)");
-			String extension = filenameSplits[filenameSplits.length - 1];
-			
-			if (!extension.equals(".jar")) continue;
-			StringBuilder filenameBuilder = new StringBuilder();
-			
-			for (int i = 0; i < filenameSplits.length - 1; i++) {
-				filenameBuilder.append(filenameSplits[i]);
-			}
-			filenameBuilder.append("-REMAPPED");
-			filenameBuilder.append(extension);
-			
-			Path newPath = remappedModsDir.resolve(filenameBuilder.toString());
-
-			if (Files.exists(newPath)) continue;
-			
-			if (firstRemap) {
-				AmidstLogger.info("Setting up remapping environment");
-				
-				// We only need to deobfuscate this into an intermediary jar because it allows us to later remap the AccessWidener.
-				if (provider.isObfuscated()) {
-					for (Path path : provider.getGameContextJars()) {
-						deobfuscate(
-							provider.getGameId(),
-							provider.getNormalizedGameVersion(),
-							Paths.get("."),
-							path,
-							knot
-						);
-					}
-				}
-				
-				Path[] knotClassPath = Arrays.stream(knotClassLoader.getURLs()).map(url -> {
-					try {
-						return Paths.get(url.toURI());
-					} catch (URISyntaxException e) {
-						return null;
-					}
-				}).filter(p -> p != null).toArray(i -> new Path[i]);
-				
-				remapper = TinyRemapper.newRemapper().withMappings(
-						TinyRemapperMappingsHelper.create(
-								FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(),
-								fromNamespace,
-								toNamespace
-						)).build();
-				remapper.readClassPath(knotClassPath);
-				inputTag = remapper.createInputTag();
-				asmRemapper = remapper.getRemapper();
-				
-				firstRemap = false;
-			}
-			
-			AmidstLogger.info("Remapping mod " + modPath.getFileName());
-			
-			try (OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(newPath).build()) {
-				remapper.readInputs(inputTag, modPath);
-				remapper.apply(outputConsumer, inputTag);
-				outputConsumer.addNonClassFiles(modPath);
-			} catch (Exception e) {
-				remapper.finish();
-				throw new RuntimeException("Failed to remap " + modPath + " to " + newPath, e);
-			}
-
-			String awFileName = null;
-			byte[] awBytes = null;
-			try (ZipFile newModZip = new ZipFile(newPath.toAbsolutePath().toString())) {
-				ZipUtil.unpackEntry(newModZip, "fabric.mod.json");
-				JsonObject modJson = new Gson().fromJson(new String(ZipUtil.unpackEntry(newModZip, "fabric.mod.json"), StandardCharsets.UTF_8), JsonObject.class);
-				if (modJson.has("accessWidener")) {
-					awFileName = modJson.get("accessWidener").getAsString();
-				}
-				
-				if (awFileName != null) {
-					AccessWidener accessWidener = new AccessWidener();
-					accessWidener.read(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(ZipUtil.unpackEntry(newModZip, awFileName)))));
-					AccessWidenerRemapper awRemapper = new AccessWidenerRemapper(accessWidener, asmRemapper, toNamespace);
-					AccessWidener remapped = awRemapper.remap();
-					try (StringWriter writer = new StringWriter()) {
-						remapped.write(writer);
-						awBytes = writer.toString().getBytes();
-					}
-				}
-				
-			} finally {
-				remapper.finish();
-			}
-			
-			if (awFileName != null) {
-				boolean replaced = ZipUtil.replaceEntry(newPath.toFile(), awFileName, awBytes);
-				
-				if (!replaced) {
-					AmidstLogger.error("Failed to replace access widener file at " + awFileName);
-				}
-			}
-			
-			if (!Files.exists(newPath)) {
-				throw new RuntimeException("Failed to remap " + modPath + " to " + newPath + " - file missing!");
-			}
-				
-//			if (NestedJars.addNestedJars(project, output)) {
-//				AmidstLogger.info("Added nested jar paths to mod json");
-//			}
-		}
 	}
 	
 	private static boolean tryAddYarnToClasspath(GameProvider provider, Knot knot, String fileEnding) throws Throwable {
