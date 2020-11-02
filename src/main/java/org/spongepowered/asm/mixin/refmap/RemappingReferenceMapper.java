@@ -37,7 +37,7 @@ import org.spongepowered.asm.mixin.extensibility.IRemapper;
 import org.spongepowered.asm.mixin.injection.struct.MemberInfo;
 import org.spongepowered.asm.obfuscation.RemapperChain;
 
-import amidst.clazz.fabric.DescriptorTableRemapper;
+import amidst.clazz.fabric.IntermediaryDescriptorRemapper;
 
 /**
 * This adapter is designed to apply the same remapping used elsewhere in
@@ -79,7 +79,7 @@ public final class RemappingReferenceMapper implements IClassReferenceMapper, IR
     * used for adding extra info to methods that need it. It relies on the
     * first remapper of the remapper chain to be this type.
     */
-   private DescriptorTableRemapper descRemapper;
+   private IntermediaryDescriptorRemapper descRemapper;
 
    private RemappingReferenceMapper(MixinEnvironment env, IReferenceMapper refMap) {
        this.refMap = refMap;
@@ -90,7 +90,7 @@ public final class RemappingReferenceMapper implements IClassReferenceMapper, IR
 			f1.setAccessible(true);
 			@SuppressWarnings("unchecked")
 			List<IRemapper> remappers = (List<IRemapper>) f1.get(remapper);
-			descRemapper = (DescriptorTableRemapper) remappers.get(0);
+			descRemapper = (IntermediaryDescriptorRemapper) remappers.get(0);
 		} catch (Throwable e) {
 			RemappingReferenceMapper.logger.info("Not using descriptor remapper in remapping reference mapper");
 		}

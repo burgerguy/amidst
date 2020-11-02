@@ -166,7 +166,7 @@ public enum FabricSetup {
 		if (DEBUG_LOGGING) env.setOption(MixinEnvironment.Option.DEBUG_VERBOSE, true);
 		
 		env.setOption(MixinEnvironment.Option.REFMAP_REMAP, true);
-		MixinIntermediaryDevRemapper remapper = new DescriptorTableRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
+		MixinIntermediaryDevRemapper remapper = new IntermediaryDescriptorRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
 		env.getRemappers().add(remapper);
 		env.setObfuscationContext(toNamespace);
 		
