@@ -388,26 +388,28 @@ public enum FabricSetup {
 		}
 		
 		URL mappingsURL = mappingsFile.toUri().toURL();
+		// add to system and knot class loader
+		addToSystemClasspath(mappingsURL);
+		knot.propose(mappingsURL);
 		
+		return true;
+	}
+	
+	private static void addToSystemClasspath(URL url) throws Throwable {
 		ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
 		try {
 			// Try using Java 8 method for adding to system classloader
 			URLClassLoader urlSystemLoader = (URLClassLoader) systemLoader;
 			Method m1 = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
 			m1.setAccessible(true);
-			m1.invoke(urlSystemLoader, mappingsURL);
+			m1.invoke(urlSystemLoader, url);
 		} catch (Throwable t) {
 			// If that didn't work, use different method for newer Java versions
 			Class<?> systemLoaderClass = Class.forName("jdk.internal.loader.ClassLoaders$AppClassLoader");
 			Method m1 = systemLoaderClass.getDeclaredMethod("appendToClassPathForInstrumentation", String.class);
 			m1.setAccessible(true);
-			m1.invoke(ClassLoader.getSystemClassLoader(), mappingsFile.toAbsolutePath().toString());
+			m1.invoke(ClassLoader.getSystemClassLoader(), url.getPath());
 		}
-		
-		// Add to knot class loader
-		knot.propose(mappingsURL);
-		
-		return true;
 	}
 	
 	private static void setMappingResolverNamespace(FabricLoader loader, String newNamespace) throws Throwable {
