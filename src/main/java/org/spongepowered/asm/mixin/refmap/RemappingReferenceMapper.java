@@ -1,3 +1,27 @@
+/*
+ * This file is part of Mixin, licensed under the MIT License (MIT).
+ *
+ * Copyright (c) SpongePowered <https://www.spongepowered.org>
+ * Copyright (c) contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 package org.spongepowered.asm.mixin.refmap;
 
 import java.lang.reflect.Field;
@@ -13,12 +37,18 @@ import org.spongepowered.asm.mixin.extensibility.IRemapper;
 import org.spongepowered.asm.mixin.injection.struct.MemberInfo;
 import org.spongepowered.asm.obfuscation.RemapperChain;
 
-import amidst.clazz.fabric.NameDescriptorRemapper;
-import amidst.logging.AmidstLogger;
+import amidst.clazz.fabric.DescriptorTableRemapper;
 
 /**
 * This adapter is designed to apply the same remapping used elsewhere in
 * the development chain (RemapperChain) to reference maps.
+* 
+* This class has been modified to be used with amidst. Methods that
+* don't have enough info after being remapped will have descriptors
+* appended to them, so they can be differentiated from other methods.
+* 
+* This class should be loaded instead of the real one because classes in
+* the main project are checked first before dependencies.
 */
 public final class RemappingReferenceMapper implements IClassReferenceMapper, IReferenceMapper {
    /**
@@ -41,7 +71,12 @@ public final class RemappingReferenceMapper implements IClassReferenceMapper, IR
     */
    private final Map<String, String> mappedReferenceCache = new HashMap<String, String>();
    
-   private NameDescriptorRemapper descRemapper;
+   /**
+    * A remapper with a method name to method name + descriptor map, which is
+    * used for adding extra info to methods that need it. It relies on the
+    * first remapper of the remapper chain to be this type.
+    */
+   private DescriptorTableRemapper descRemapper;
 
    private RemappingReferenceMapper(MixinEnvironment env, IReferenceMapper refMap) {
        this.refMap = refMap;
@@ -52,9 +87,9 @@ public final class RemappingReferenceMapper implements IClassReferenceMapper, IR
 			f1.setAccessible(true);
 			@SuppressWarnings("unchecked")
 			List<IRemapper> remappers = (List<IRemapper>) f1.get(remapper);
-			descRemapper = (NameDescriptorRemapper) remappers.get(0);
+			descRemapper = (DescriptorTableRemapper) remappers.get(0);
 		} catch (Throwable e) {
-			AmidstLogger.crash(e);
+			RemappingReferenceMapper.logger.info("Not using descriptor remapper in remapping reference mapper");
 		}
        
        RemappingReferenceMapper.logger.info("Remapping refMap {} using remapper chain", refMap.getResourceName());
@@ -150,7 +185,10 @@ public final class RemappingReferenceMapper implements IClassReferenceMapper, IR
                        info.getDesc() == null ? null : remapper.mapDesc(info.getDesc())
                ).toString();
            } else {
-        	   if (info.getDesc() == null && info.getName() != null && !remapped.equals("<init>") && !remapped.equals("<clinit>")) {
+        	   // handle methods that won't have enough info after remapping
+        	   if (descRemapper != null && info.getDesc() == null && info.getName() != null 
+        			   && !remapped.equals("<init>") && !remapped.equals("<clinit>")) {
+        		   
         		   String withDesc = descRemapper.methodNameDescMap.get(remapped);
         		   if (withDesc != null && !withDesc.equals(remapped)) {
 	        		   MemberInfo newInfo = MemberInfo.parse(withDesc, null, null);

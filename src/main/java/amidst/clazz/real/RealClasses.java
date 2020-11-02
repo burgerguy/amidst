@@ -48,7 +48,6 @@ public enum RealClasses {
 			throws IOException,
 			RealClassCreationException {
 		for (Path path: (Iterable<Path>) Files.list(directory)::iterator) {
-			//String realClassName = getPathWithoutExtension(path.toString(), "class");
 			String realClassName = getFileNameWithoutExtension(path.getFileName().toString(), "class");
 			if (Files.isDirectory(path)) {
 				readJarFileDirectory(path, result);
@@ -71,7 +70,6 @@ public enum RealClasses {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private static String getFileNameWithoutExtension(String fileName, String extension) {
 		String[] split = fileName.split("\\.");
 		if (split.length == 2 && split[0].indexOf('/') == -1 && split[1].equals(extension)) {
@@ -80,15 +78,5 @@ public enum RealClasses {
 			return null;
 		}
 	}
-	
-	private static String getPathWithoutExtension(String path, String extension) {
-		String noExt = path.split("\\." + extension)[0];
-		noExt = noExt.replace('/', '.');
-		if (noExt.charAt(0) == '.') {
-			return noExt.substring(1);
-		} else {
-			return noExt;
-		}
-	}
-	
+
 }

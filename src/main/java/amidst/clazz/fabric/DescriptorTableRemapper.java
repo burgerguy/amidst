@@ -11,11 +11,11 @@ import net.fabricmc.mapping.tree.TinyTree;
 import net.fabricmc.mapping.util.MixinRemapper;
 import net.fabricmc.mappings.EntryTriple;
 
-public class NameDescriptorRemapper extends MixinIntermediaryDevRemapper {
+public class DescriptorTableRemapper extends MixinIntermediaryDevRemapper {
 	public final Map<String, String> methodNameDescMap = new HashMap<String, String>();
 
 	@SuppressWarnings("unchecked")
-	public NameDescriptorRemapper(TinyTree mappings, String from, String to) {
+	public DescriptorTableRemapper(TinyTree mappings, String from, String to) {
 		super(mappings, from, to);
 
 		try {

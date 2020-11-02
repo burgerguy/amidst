@@ -145,7 +145,6 @@ public enum FabricSetup {
 		// it makes sense to disable the modification of classes as it removes the
 		// possibility of faliure in that aspect. This may break some mods that require
 		// janky entrypoints.
-		
 		fakeInitializeEntrypointTransformer(provider.getEntrypointTransformer());
 		
 		// This doesn't actually switch the classloader, this only does something if
@@ -167,7 +166,7 @@ public enum FabricSetup {
 		if (DEBUG_LOGGING) env.setOption(MixinEnvironment.Option.DEBUG_VERBOSE, true);
 		
 		env.setOption(MixinEnvironment.Option.REFMAP_REMAP, true);
-		MixinIntermediaryDevRemapper remapper = new NameDescriptorRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
+		MixinIntermediaryDevRemapper remapper = new DescriptorTableRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
 		env.getRemappers().add(remapper);
 		env.setObfuscationContext(toNamespace);
 		
@@ -175,13 +174,6 @@ public enum FabricSetup {
 			env.setOption(MixinEnvironment.Option.DEBUG_EXPORT, true);
 			env.setOption(MixinEnvironment.Option.DUMP_TARGET_ON_FAILURE, true);
 		}
-		
-		if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Applying patches for RemappingReferenceMapper...");
-		Method m1 = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-		m1.setAccessible(true);
-		byte[] classBytes = RemapRefMapASM.dump();
-		m1.invoke(ClassLoader.getSystemClassLoader(), "org.spongepowered.asm.mixin.refmap.RemappingReferenceMapper", classBytes, 0, classBytes.length);
-		if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Patches applied");
 		
 		FabricMixinBootstrap.init(ENVIRONMENT_TYPE, loader);
 		finishMixinBootstrapping();
@@ -196,10 +188,6 @@ public enum FabricSetup {
 																 // this stage. After invoking the preLaunch entrypoint, it loads
 																 // the main Minecraft class and invokes the main, where the main
 																 // entrypoint would have been invoked naturally.
-		
-//		EntrypointUtils.invoke("main", ModInitializer.class, ModInitializer::onInitialize);
-//		EntrypointUtils.invoke("client", ClientModInitializer.class, ClientModInitializer::onInitializeClient);
-//		EntrypointUtils.invoke("server", DedicatedServerModInitializer.class, DedicatedServerModInitializer::onInitializeServer);
 		
 		return knotClassLoader;
 	}
@@ -248,7 +236,8 @@ public enum FabricSetup {
 	
 	private static void setupLoader(FabricLoader loader, GameProvider provider, ClassLoader knotClassLoader,
 			URL[] systemClassPath, URL[] providedClassPath, URL gameJarUrl) throws Throwable {
-		try {			
+		try {
+			Files.createDirectories(loader.getModsDir());
 			ModResolver resolver = new ModResolver();
 			resolver.addCandidateFinder(new ClasspathModCandidateFinder());
 			resolver.addCandidateFinder(new DirectoryModCandidateFinder(loader.getModsDir(), RUNTIME_REMAPPING));
@@ -275,11 +264,7 @@ public enum FabricSetup {
 			addModMethod.setAccessible(true);
 			
 			for (ModCandidate candidate : CustomRuntimeModRemapper.remap(fromNamespace, toNamespace, candidateMap.values(), ModResolver.getInMemoryFs(), provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl)) {
-				// The biome api is excluded because it always fails at appendNetherBiomes after 1.16.2.
-				// I'm pretty sure there's some bug with processing lambdas at some point within the pipeline that I'm trying to debug.
-//				if (!candidate.getInfo().getId().equals("fabric-biome-api-v1")) {
-					addModMethod.invoke(loader, candidate);
-//				}
+				addModMethod.invoke(loader, candidate);
 			}
 			
 		} catch (ModResolutionException exception) {
