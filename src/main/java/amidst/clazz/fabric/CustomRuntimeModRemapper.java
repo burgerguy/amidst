@@ -48,7 +48,7 @@ public class CustomRuntimeModRemapper {
 	public static Collection<ModCandidate> remap(String from, String to, Collection<ModCandidate> modCandidates,
 			FileSystem fileSystem, GameProvider provider, ClassLoader knotClassLoader, URL[] systemClassPath, URL[] providedClassPath, URL gameJarUrl) {
 		
-		AmidstLogger.info("Setting up remapping environment...");
+		if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Setting up remapping environment...");
 		
 		List<ModCandidate> modsToRemap = modCandidates.stream().filter(ModCandidate::requiresRemap)
 				.collect(Collectors.toList());
@@ -105,7 +105,7 @@ public class CustomRuntimeModRemapper {
 		List<ModCandidate> remappedMods = new ArrayList<>();
 		
 		try {
-			AmidstLogger.info("Reading mods...");
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Reading mods...");
 			Map<ModCandidate, RemapInfo> infoMap = new HashMap<>();
 			
 			for (ModCandidate mod : modsToRemap) {
@@ -119,7 +119,7 @@ public class CustomRuntimeModRemapper {
 				remapper.readInputsAsync(tag, info.inputPath);
 			}
 			
-			AmidstLogger.info("Remapping classes...");
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Remapping classes...");
 			//Done in a 2nd loop as we need to make sure all the inputs are present before remapping
 			for (ModCandidate mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);
@@ -141,7 +141,7 @@ public class CustomRuntimeModRemapper {
 				remapper.apply(outputConsumer, info.tag);
 			}
 			
-			AmidstLogger.info("Remapping access wideners...");
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Remapping access wideners...");
 			//Done in a 3rd loop as this can happen when the remapper is doing its thing.
 			for (ModCandidate mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);
@@ -159,7 +159,7 @@ public class CustomRuntimeModRemapper {
 			}
 			
 			remapper.finish();
-			AmidstLogger.info("Finished remapping");
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Finished remapping");
 			
 			for (ModCandidate mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);

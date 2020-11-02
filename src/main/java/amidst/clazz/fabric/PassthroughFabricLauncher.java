@@ -29,7 +29,7 @@ public class PassthroughFabricLauncher implements FabricLauncher {
 	
 	@Override
 	public void propose(URL url) {
-		AmidstLogger.debug("Rejected proposition of " + url + " to classpath");
+		if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Rejected proposition of " + url + " to classpath");
 	}
 	
 	@Override

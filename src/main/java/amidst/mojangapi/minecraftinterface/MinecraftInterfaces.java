@@ -1,6 +1,5 @@
 package amidst.mojangapi.minecraftinterface;
 
-import java.io.File;
 import java.net.URLClassLoader;
 import java.util.Map;
 import java.util.function.BiFunction;

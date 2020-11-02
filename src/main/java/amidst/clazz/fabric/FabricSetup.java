@@ -52,13 +52,13 @@ import net.fabricmc.loader.util.mappings.MixinIntermediaryDevRemapper;
 
 public enum FabricSetup {
 	;
-	private static final EnvType ENVIRONMENT_TYPE = EnvType.CLIENT;
-	private static final boolean DEVELOPMENT = false; // if this is set to true then all normally compiled mods break
-	private static final boolean DEBUG_LOGGING = Boolean.getBoolean("amidst.fabric.debug");
-	private static final boolean RUNTIME_REMAPPING = true;
-	private static final boolean DEBUG_DUMPING = false;
-	private static final String fromNamespace = "intermediary";
-	private static final String toNamespace = "official";
+	static final EnvType ENVIRONMENT_TYPE = EnvType.CLIENT;
+	static final boolean DEVELOPMENT = false; // if this is set to true then all normally compiled mods break
+	static final boolean DEBUG_LOGGING = Boolean.getBoolean("amidst.fabric.debug");
+	static final boolean RUNTIME_REMAPPING = true;
+	static final boolean DEBUG_DUMPING = false;
+	static final String fromNamespace = "intermediary";
+	static final String toNamespace = "official";
 	
 	public static ClassLoader initAndGetClassLoader(URLClassLoader ucl, Path clientJarPath) throws Throwable {
 		
@@ -75,7 +75,7 @@ public enum FabricSetup {
 		}
 		
 		if (provider != null) {
-			AmidstLogger.info("[FabricSetup] Loading for game " + provider.getGameName() + " " + provider.getRawGameVersion());
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Loading for game " + provider.getGameName() + " " + provider.getRawGameVersion());
 		} else {
 			AmidstLogger.error("[FabricSetup] Could not find valid game provider!");
 			for (GameProvider p : providers) {
@@ -87,7 +87,8 @@ public enum FabricSetup {
 		provider.acceptArguments("--gameDir", ".fabric" + File.separator + "environments" + File.separator + provider.getRawGameVersion());
 		
 		// Reflect classloader instance
-		// we need a url class loader so we can later obtain its classpath
+		// We don't try to use the compatability classloader because some mods depend on the normal one for some reason
+		// (looking at you, gudenau)
 		Constructor<?> constructor = Class.forName("net.fabricmc.loader.launch.knot.KnotClassLoader").getDeclaredConstructors()[0];
 		constructor.setAccessible(true);
 		ClassLoader knotClassLoader = (ClassLoader) constructor.newInstance(DEVELOPMENT, ENVIRONMENT_TYPE, provider);
@@ -121,7 +122,7 @@ public enum FabricSetup {
 				 && !url.sameFile(gameJarUrl)) {
 					knot.propose(url);
 				} else {
-					if (DEBUG_LOGGING) AmidstLogger.debug("Rejected URL: " + url);
+					if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Rejected URL: " + url);
 				}
 			}
 			
@@ -131,7 +132,7 @@ public enum FabricSetup {
 		
 		boolean mergedMappings = RecognisedVersion.isNewerOrEqualTo(RecognisedVersion.fromName(provider.getRawGameVersion()), RecognisedVersion._20w10a);
 		if (tryAddYarnToClasspath(provider, knot, mergedMappings ? "-mergedv2.jar" : ".jar")) {
-			AmidstLogger.info("Finished setting up yarn mappings");
+			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Finished setting up yarn mappings");
 		} else {
 			throw new UnsupportedOperationException("Minecraft version incompatible with Fabric");
 		}
@@ -146,7 +147,6 @@ public enum FabricSetup {
 		// janky entrypoints.
 		
 		fakeInitializeEntrypointTransformer(provider.getEntrypointTransformer());
-//		provider.getEntrypointTransformer().locateEntrypoints(knot);
 		
 		// This doesn't actually switch the classloader, this only does something if
 		// getContextClassLoader() gets called on the same thread somewhere else.
@@ -156,7 +156,6 @@ public enum FabricSetup {
 		FabricLoader loader = FabricLoader.INSTANCE;
 		setMappingResolverNamespace(loader, toNamespace);
 		loader.setGameProvider(provider);
-//		loader.load();
 		setupLoader(loader, provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl);
 		loader.freeze();
 		
@@ -168,14 +167,21 @@ public enum FabricSetup {
 		if (DEBUG_LOGGING) env.setOption(MixinEnvironment.Option.DEBUG_VERBOSE, true);
 		
 		env.setOption(MixinEnvironment.Option.REFMAP_REMAP, true);
-		MixinIntermediaryDevRemapper remapper = new MixinIntermediaryDevRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
+		MixinIntermediaryDevRemapper remapper = new NameDescriptorRemapper(FabricLauncherBase.getLauncher().getMappingConfiguration().getMappings(), fromNamespace, toNamespace);
 		env.getRemappers().add(remapper);
-//		env.setOption(MixinEnvironment.Option.REFMAP_REMAP_ALLOW_PERMISSIVE, true);
+		env.setObfuscationContext(toNamespace);
 		
 		if (DEBUG_DUMPING) {
 			env.setOption(MixinEnvironment.Option.DEBUG_EXPORT, true);
 			env.setOption(MixinEnvironment.Option.DUMP_TARGET_ON_FAILURE, true);
 		}
+		
+		if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Applying patches for RemappingReferenceMapper...");
+		Method m1 = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
+		m1.setAccessible(true);
+		byte[] classBytes = RemapRefMapASM.dump();
+		m1.invoke(ClassLoader.getSystemClassLoader(), "org.spongepowered.asm.mixin.refmap.RemappingReferenceMapper", classBytes, 0, classBytes.length);
+		if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Patches applied");
 		
 		FabricMixinBootstrap.init(ENVIRONMENT_TYPE, loader);
 		finishMixinBootstrapping();
@@ -270,9 +276,10 @@ public enum FabricSetup {
 			
 			for (ModCandidate candidate : CustomRuntimeModRemapper.remap(fromNamespace, toNamespace, candidateMap.values(), ModResolver.getInMemoryFs(), provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl)) {
 				// The biome api is excluded because it always fails at appendNetherBiomes after 1.16.2.
-				if (!candidate.getInfo().getId().equals("fabric-biome-api-v1")) {
+				// I'm pretty sure there's some bug with processing lambdas at some point within the pipeline that I'm trying to debug.
+//				if (!candidate.getInfo().getId().equals("fabric-biome-api-v1")) {
 					addModMethod.invoke(loader, candidate);
-				}
+//				}
 			}
 			
 		} catch (ModResolutionException exception) {
@@ -287,7 +294,7 @@ public enum FabricSetup {
 			targetClass = "net.fabricmc.loader.entrypoint.applet.AppletMain";
 		}
 		
-		if(DEBUG_LOGGING) AmidstLogger.debug("Loading GameProvider entrypoint: " + targetClass);
+		if(DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Loading GameProvider entrypoint: " + targetClass);
 		loader.loadClass(targetClass);
 	}
 	
@@ -325,9 +332,9 @@ public enum FabricSetup {
 		Map<String, List<?>> entryMap = (Map<String, List<?>>) f2.get(entrypointStorage);
 		
 		for(String entrypoint : entryMap.keySet()) {
-			AmidstLogger.debug("Entrypoint " + entrypoint + ":");
+			AmidstLogger.info("[FabricSetup] Entrypoint " + entrypoint + ":");
 			for (Object entry : entryMap.get(entrypoint)) {
-				AmidstLogger.debug("	Entry " + entry);
+				AmidstLogger.info("[FabricSetup]     Entry " + entry);
 			}
 		}
 	}
@@ -364,13 +371,13 @@ public enum FabricSetup {
 		}
 		
 		if (mappingsFile != null) {
-			if (DEBUG_LOGGING) AmidstLogger.debug("Local yarn mappings found at " + mappingsFile.toAbsolutePath().toString());
+			if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Local yarn mappings found at " + mappingsFile.toAbsolutePath().toString());
 			
 		} else {
-			if (DEBUG_LOGGING) AmidstLogger.debug("No local yarn mappings found. Downloading...");
+			if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] No local yarn mappings found. Downloading...");
 			Files.createDirectories(mappingsDir);
 			
-			if (DEBUG_LOGGING) AmidstLogger.debug("Reading mappings build versions for " + rawGameVersion + "...");
+			if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Reading mappings build versions for " + rawGameVersion + "...");
 			try (InputStreamReader versionsReader = new InputStreamReader(new URL("https://maven.fabricmc.net/net/fabricmc/yarn/versions.json").openStream())) {
 				JsonObject versionsRoot = new Gson().fromJson(versionsReader, JsonObject.class);
 				JsonArray buildsArray = versionsRoot.get(rawGameVersion).getAsJsonArray();
@@ -382,7 +389,7 @@ public enum FabricSetup {
 			}
 			
 			mappingsFile = mappingsDir.resolve("yarn-" + rawGameVersion + "+build." + buildVer + fileEnding);
-			if (DEBUG_LOGGING) AmidstLogger.debug("Downloading yarn mappings " + rawGameVersion + " build " + buildVer + "...");
+			if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Downloading yarn mappings " + rawGameVersion + " build " + buildVer + "...");
 			
 			try (ReadableByteChannel readableByteChannel = Channels.newChannel(
 					new URL("https://maven.fabricmc.net/net/fabricmc/yarn/" + rawGameVersion + "%2Bbuild." + buildVer
@@ -392,7 +399,7 @@ public enum FabricSetup {
 				}
 			}
 			
-			if (DEBUG_LOGGING) AmidstLogger.debug("Yarn mappings saved to " + mappingsFile.toAbsolutePath().toString());
+			if (DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Yarn mappings saved to " + mappingsFile.toAbsolutePath().toString());
 		}
 		
 		URL mappingsURL = mappingsFile.toUri().toURL();
