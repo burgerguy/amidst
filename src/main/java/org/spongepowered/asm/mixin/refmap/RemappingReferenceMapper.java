@@ -48,7 +48,10 @@ import amidst.clazz.fabric.DescriptorTableRemapper;
 * appended to them, so they can be differentiated from other methods.
 * 
 * This class should be loaded instead of the real one because classes in
-* the main project are checked first before dependencies.
+* the main project are checked first before dependencies. It was
+* probably really lucky that I can use this method, because if this
+* class used anything that it wouldn't have access to in a separate
+* package, it wouldn't work.
 */
 public final class RemappingReferenceMapper implements IClassReferenceMapper, IReferenceMapper {
    /**
