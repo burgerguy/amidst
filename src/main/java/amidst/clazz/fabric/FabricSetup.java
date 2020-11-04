@@ -87,8 +87,8 @@ public enum FabricSetup {
 		provider.acceptArguments("--gameDir", ".fabric" + File.separator + "environments" + File.separator + provider.getRawGameVersion());
 		
 		// Reflect classloader instance
-		// We don't try to use the compatability classloader because some mods depend on the normal one for some reason
-		// (looking at you, gudenau)
+		// We don't try to use the compatability classloader because some mods
+		// depend on the normal one for some reason (looking at you, gudenau)
 		Constructor<?> constructor = Class.forName("net.fabricmc.loader.launch.knot.KnotClassLoader").getDeclaredConstructors()[0];
 		constructor.setAccessible(true);
 		ClassLoader knotClassLoader = (ClassLoader) constructor.newInstance(DEVELOPMENT, ENVIRONMENT_TYPE, provider);
@@ -140,7 +140,7 @@ public enum FabricSetup {
 		// FABRIC DOC: Locate entrypoints before switching class loaders
 		// Read documentation at the setContextClassLoader() for more info as to why
 		// this isn't exactly true.
-		
+		// 
 		// Because we're always going to be manually invoking the entrypoints anyway,
 		// it makes sense to disable the modification of classes as it removes the
 		// possibility of faliure in that aspect. This may break some mods that require
