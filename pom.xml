@@ -187,7 +187,7 @@
 		<dependency>
 			<groupId>net.fabricmc</groupId>
 			<artifactId>fabric-loader</artifactId>
-			<version>0.10.5+build.213</version>
+			<version>0.10.6+build.214</version>
 		</dependency>
 		<dependency>
 			<groupId>net.fabricmc</groupId>
@@ -223,6 +223,11 @@
 			<groupId>net.fabricmc</groupId>
 			<artifactId>fabric-loom</artifactId>
 			<version>0.5.9</version>
+		</dependency>
+		<dependency>
+			<groupId>net.fabricmc</groupId>
+			<artifactId>access-widener</artifactId>
+			<version>1.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.ow2.asm</groupId>

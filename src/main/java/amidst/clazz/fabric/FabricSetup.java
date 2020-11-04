@@ -54,9 +54,9 @@ public enum FabricSetup {
 	;
 	static final EnvType ENVIRONMENT_TYPE = EnvType.CLIENT;
 	static final boolean DEVELOPMENT = false; // if this is set to true then all normally compiled mods break
-	static final boolean DEBUG_LOGGING = Boolean.getBoolean("amidst.fabric.debug");
 	static final boolean RUNTIME_REMAPPING = true;
-	static final boolean DEBUG_DUMPING = false;
+	static final boolean DEBUG_LOGGING = Boolean.getBoolean("amidst.fabric.debug");
+	static final boolean DEBUG_DUMPING = Boolean.getBoolean("amidst.fabric.dumpClasses");
 	static final String fromNamespace = "intermediary";
 	static final String toNamespace = "official";
 	
@@ -157,8 +157,7 @@ public enum FabricSetup {
 		loader.setGameProvider(provider);
 		setupLoader(loader, provider, knotClassLoader, systemClassPath, providedClassPath, gameJarUrl);
 		loader.freeze();
-		
-		loader.getAccessWidener().loadFromMods();
+		loader.loadAccessWideners();
 
 		MixinBootstrap.init();
 		

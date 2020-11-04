@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -29,12 +28,14 @@ import java.util.stream.Stream;
 import org.objectweb.asm.commons.Remapper;
 
 import amidst.logging.AmidstLogger;
-import net.fabricmc.loader.FabricLoader;
+import net.fabricmc.accesswidener.AccessWidener;
+import net.fabricmc.accesswidener.AccessWidenerReader;
+import net.fabricmc.accesswidener.AccessWidenerRemapper;
+import net.fabricmc.accesswidener.AccessWidenerWriter;
 import net.fabricmc.loader.discovery.ModCandidate;
 import net.fabricmc.loader.game.GameProvider;
 import net.fabricmc.loader.launch.common.FabricLauncher;
 import net.fabricmc.loader.launch.common.FabricLauncherBase;
-import net.fabricmc.loader.transformer.accesswidener.AccessWidener;
 import net.fabricmc.loader.util.FileSystemUtil;
 import net.fabricmc.loader.util.UrlConversionException;
 import net.fabricmc.loader.util.UrlUtil;
@@ -190,18 +191,17 @@ public class CustomRuntimeModRemapper {
 	private static byte[] remapAccessWidener(byte[] input, Remapper remapper, String to) {
 		try (BufferedReader bufferedReader = new BufferedReader(
 				new InputStreamReader(new ByteArrayInputStream(input), StandardCharsets.UTF_8))) {
-			@SuppressWarnings("deprecation")
-			AccessWidener accessWidener = new AccessWidener(FabricLoader.INSTANCE);
-			accessWidener.read(bufferedReader, null);
+			AccessWidener accessWidener = new AccessWidener();
+			new AccessWidenerReader(accessWidener).read(bufferedReader);
 			
-			FixedAWRemapper accessWidenerRemapper = new FixedAWRemapper(accessWidener, remapper, to);
+			AccessWidenerRemapper accessWidenerRemapper = new AccessWidenerRemapper(accessWidener, remapper, to);
 			AccessWidener remapped = accessWidenerRemapper.remap();
 			
 			try (StringWriter writer = new StringWriter()) {
-				remapped.write(writer);
+				new AccessWidenerWriter(remapped).write(writer);
 				return writer.toString().getBytes(StandardCharsets.UTF_8);
 			}
-		} catch (IOException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+		} catch (IOException | IllegalArgumentException e) {
 			throw new RuntimeException(e);
 		}
 	}
