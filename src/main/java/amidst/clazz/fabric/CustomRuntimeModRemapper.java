@@ -140,6 +140,8 @@ public class CustomRuntimeModRemapper {
 				info.outputConsumerPath = outputConsumer;
 				
 				remapper.apply(outputConsumer, info.tag);
+				
+				if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Remapped classes for mod " + mod.getInfo().getId());
 			}
 			
 			if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Remapping access wideners...");
@@ -157,6 +159,8 @@ public class CustomRuntimeModRemapper {
 						info.accessWidener = remapAccessWidener(Files.readAllBytes(fs.getPath(accessWidener)), remapper.getRemapper(), to);
 					}
 				}
+				
+				if(FabricSetup.DEBUG_LOGGING) AmidstLogger.info("[FabricSetup] Remapped access widener for mod " + mod.getInfo().getId());
 			}
 			
 			remapper.finish();
